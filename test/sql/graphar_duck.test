@@ -1,0 +1,23 @@
+# name: test/sql/graphar_duck.test
+# description: test graphar_duck extension
+# group: [graphar_duck]
+
+# Before we load the extension, this will fail
+statement error
+SELECT graphar_duck('Sam');
+----
+Catalog Error: Scalar Function with name graphar_duck does not exist!
+
+# Require statement will ensure this test is run with this extension loaded
+require graphar_duck
+
+# Confirm the extension works
+query I
+SELECT graphar_duck('Sam');
+----
+GrapharDuck Sam 🐥
+
+query I
+SELECT graphar_duck_openssl_version('Michael') ILIKE 'GrapharDuck Michael, my linked OpenSSL version is OpenSSL%';
+----
+true

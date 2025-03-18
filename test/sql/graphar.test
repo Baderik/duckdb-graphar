@@ -1,0 +1,23 @@
+# name: test/sql/graphar.test
+# description: test graphar extension
+# group: [graphar]
+
+# Before we load the extension, this will fail
+statement error
+SELECT graphar('Sam');
+----
+Catalog Error: Scalar Function with name graphar does not exist!
+
+# Require statement will ensure this test is run with this extension loaded
+require graphar
+
+# Confirm the extension works
+query I
+SELECT graphar('Sam');
+----
+Graphar Sam 🐥
+
+query I
+SELECT graphar_openssl_version('Michael') ILIKE 'Graphar Michael, my linked OpenSSL version is OpenSSL%';
+----
+true
