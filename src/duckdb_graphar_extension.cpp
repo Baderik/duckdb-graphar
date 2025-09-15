@@ -7,6 +7,7 @@
 #include "functions/table/hop.hpp"
 #include "functions/table/read_edges.hpp"
 #include "functions/table/read_vertices.hpp"
+#include "functions/table/hop_thread.hpp"
 #include "storage/graphar_storage.hpp"
 #include "utils/global_log_manager.hpp"
 
@@ -46,6 +47,9 @@ static void LoadInternal(DatabaseInstance& instance) {
     EdgesVertex::Register(instance);
     TwoHop::Register(instance);
     OneMoreHop::Register(instance);
+//    TestF::Register(instance);
+    TwoHopParquet::Register(instance);
+    FastTwoHop::Register(instance);
 
     config.storage_extensions["duckdb_graphar"] = make_uniq<GraphArStorageExtension>();
 }

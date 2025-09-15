@@ -23,7 +23,7 @@ unique_ptr<FunctionData> TwoHop::Bind(ClientContext& context, TableFunctionBindI
 
     ScopedTimer t("Bind");
 
-    DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::Bind");
+    DUCKDB_GRAPHAR_LOG_TRACE("Hop::Bind");
 
     const auto file_path = StringValue::Get(input.inputs[0]);
     const int64_t vid = IntegerValue::Get(input.named_parameters.at("vid"));
@@ -44,9 +44,9 @@ unique_ptr<FunctionData> TwoHop::Bind(ClientContext& context, TableFunctionBindI
     DUCKDB_GRAPHAR_LOG_DEBUG("Set types and names");
 
     return_types.push_back(LogicalType::BIGINT);
-    names.push_back("_graphArSrcIndex");
+    names.push_back(SRC_GID_COLUMN);
     return_types.push_back(LogicalType::BIGINT);
-    names.push_back("_graphArDstIndex");
+    names.push_back(DST_GID_COLUMN);
 
     DUCKDB_GRAPHAR_LOG_DEBUG("Bind finish");
     if (time_logging) {
@@ -54,6 +54,15 @@ unique_ptr<FunctionData> TwoHop::Bind(ClientContext& context, TableFunctionBindI
     }
 
     return bind_data;
+}
+unique_ptr<FunctionData> OneMoreHop::Bind(ClientContext& context, TableFunctionBindInput& input,
+                                          vector<LogicalType>& return_types, vector<string>& names) {
+    return TwoHop::Bind(context, input, return_types, names);
+}
+unique_ptr<FunctionData> FastTwoHop::Bind(ClientContext& context, TableFunctionBindInput& input,
+                                          vector<LogicalType>& return_types, vector<string>& names) {
+    DUCKDB_GRAPHAR_LOG_DEBUG("FastTwoHop::Bind");
+    return TwoHop::Bind(context, input, return_types, names);
 }
 //-------------------------------------------------------------------
 // State Init
@@ -69,6 +78,26 @@ unique_ptr<GlobalTableFunctionState> OneMoreHopGlobalTableFunctionState::Init(Cl
     auto bind_data = input.bind_data->Cast<TwoHopBindData>();
 
     return make_uniq<OneMoreHopGlobalTableFunctionState>(context, bind_data);
+}
+unique_ptr<GlobalTableFunctionState> FastTwoHopGTFS::Init(ClientContext& context,
+                                                          TableFunctionInitInput& input) {
+    DUCKDB_GRAPHAR_LOG_DEBUG("FastTwoHop::GlobalTableFunctionState::Init");
+    auto bind_data = input.bind_data->Cast<FastTwoHopBD>();
+
+    std::unique_ptr<FastTwoHopGTFS> gtfs = make_uniq<FastTwoHopGTFS>(context, bind_data);
+    FastTwoHopGS& state = gtfs->GetState();
+    state.offset_reader = std::make_shared<OffsetReader>(bind_data.GetEdgeInfo(),
+                                                         bind_data.GetPrefix(),
+                                                         graphar::AdjListType::ordered_by_source);
+    state.reader = std::make_unique<LowEdgeReaderByVertex>(bind_data.GetEdgeInfo(),
+                                                           bind_data.GetPrefix(),
+                                                           graphar::AdjListType::ordered_by_source,
+                                                           state.offset_reader);
+    DUCKDB_GRAPHAR_LOG_DEBUG("Reader started before " + to_string(state.reader->started()));
+    state.reader->SetVertex(bind_data.GetVid());
+    DUCKDB_GRAPHAR_LOG_DEBUG("Reader started after " + to_string(state.reader->started()));
+
+    return std::move(gtfs);
 }
 //-------------------------------------------------------------------
 // Execute
@@ -99,39 +128,6 @@ inline void OneHopExecute(TwoHopGlobalState& state, DataChunk& output, const boo
     }
 
     DUCKDB_GRAPHAR_LOG_DEBUG("OneHopExecute::Finish " + std::to_string(table->num_rows()));
-}
-
-inline void TwoHop::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
-    bool time_logging = GraphArSettings::is_time_logging(context);
-
-    ScopedTimer t("Execute");
-
-    DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::Execute");
-    DUCKDB_GRAPHAR_LOG_DEBUG("Cast Global state");
-
-    TwoHopGlobalState& gstate = input.global_state->Cast<TwoHopGlobalTableFunctionState>().GetState();
-
-    if (gstate.GetSrcReader().finish()) {
-        DUCKDB_GRAPHAR_LOG_DEBUG("Reader finished");
-        return;
-    }
-
-    DUCKDB_GRAPHAR_LOG_DEBUG("Begin iteration");
-    OneHopExecute(gstate, output, time_logging);
-
-    if (gstate.GetSrcReader().finish()) {
-        if (gstate.IsOneHop()) {
-            gstate.SetOneHop(false);
-        }
-        while (gstate.GetHopI() < gstate.GetHopIds().size() && gstate.GetSrcReader().finish()) {
-            DUCKDB_GRAPHAR_LOG_DEBUG("Find next hop " + std::to_string(gstate.GetHopIds()[gstate.GetHopI()]));
-            gstate.GetSrcReader().find_src(gstate.GetHopIds()[gstate.IncrementHopI()]);
-        }
-    }
-
-    if (time_logging) {
-        t.print();
-    }
 }
 
 inline int64_t OneMoreHopExecute(OneMoreHopGlobalState& state, DataChunk& output, const bool time_logging) {
@@ -185,6 +181,39 @@ inline int64_t OneMoreHopExecute(OneMoreHopGlobalState& state, DataChunk& output
     return number_valid;
 }
 
+inline void TwoHop::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
+    bool time_logging = GraphArSettings::is_time_logging(context);
+
+    ScopedTimer t("Execute");
+
+    DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::Execute");
+    DUCKDB_GRAPHAR_LOG_DEBUG("Cast Global state");
+
+    TwoHopGlobalState& gstate = input.global_state->Cast<TwoHopGlobalTableFunctionState>().GetState();
+
+    if (gstate.GetSrcReader().finish()) {
+        DUCKDB_GRAPHAR_LOG_DEBUG("Reader finished");
+        return;
+    }
+
+    DUCKDB_GRAPHAR_LOG_DEBUG("Begin iteration");
+    OneHopExecute(gstate, output, time_logging);
+
+    if (gstate.GetSrcReader().finish()) {
+        if (gstate.IsOneHop()) {
+            gstate.SetOneHop(false);
+        }
+        while (gstate.GetHopI() < gstate.GetHopIds().size() && gstate.GetSrcReader().finish()) {
+            DUCKDB_GRAPHAR_LOG_DEBUG("Find next hop " + std::to_string(gstate.GetHopIds()[gstate.GetHopI()]));
+            gstate.GetSrcReader().find_src(gstate.GetHopIds()[gstate.IncrementHopI()]);
+        }
+    }
+
+    if (time_logging) {
+        t.print();
+    }
+}
+
 inline void OneMoreHop::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
     bool time_logging = GraphArSettings::is_time_logging(context);
 
@@ -223,6 +252,62 @@ inline void OneMoreHop::Execute(ClientContext& context, TableFunctionInput& inpu
         t.print();
     }
 }
+
+void FastTwoHop::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
+    DUCKDB_GRAPHAR_LOG_DEBUG("FastTwoHop::Execute");
+
+    FastTwoHopGS& global_state = input.global_state->Cast<FastTwoHopGTFS>().GetState();
+
+    DUCKDB_GRAPHAR_LOG_DEBUG("global state casted");
+    std::unique_ptr<DataChunk> data;
+    DUCKDB_GRAPHAR_LOG_DEBUG("Reader exist " + to_string(global_state.reader != nullptr));
+    DUCKDB_GRAPHAR_LOG_DEBUG("Reader started " + to_string(global_state.reader->started()));
+
+    if (global_state.one_hop) {
+        if (!global_state.reader->started()) {
+            DUCKDB_GRAPHAR_LOG_DEBUG("OneHop started");
+            std::unique_ptr<Connection> conn = std::make_unique<Connection>(*context.db);
+            global_state.reader->start(std::move(conn));
+        }
+        data = std::move(global_state.reader->read());
+        if (data == nullptr) {
+            global_state.one_hop = false;
+        } else {
+            DUCKDB_GRAPHAR_LOG_DEBUG(to_string(data->size()) + " found vertexes");
+            for (idx_t i = 0; i < data->size(); i++) {
+                global_state.hop_ids.emplace(data->GetValue(1, i).GetValue<int64_t>());
+            }
+            output.Reference(*data);
+            return ;
+        }
+        DUCKDB_GRAPHAR_LOG_DEBUG("OneHop finished")
+        global_state.init_iter();
+        DUCKDB_GRAPHAR_LOG_DEBUG("Init set iterator");
+        if (global_state.hop_i != global_state.hop_ids.end()) {
+            global_state.reader->SetVertex(*global_state.hop_i);
+        }
+    }
+    while (global_state.hop_i != global_state.hop_ids.end()) {
+        if (!global_state.reader->started()) {
+            DUCKDB_GRAPHAR_LOG_DEBUG("VertexHop started")
+            std::unique_ptr<Connection> conn = std::make_unique<Connection>(*context.db);
+            global_state.reader->start(std::move(conn));
+        }
+        data = std::move(global_state.reader->read());
+
+        if (data != nullptr) {
+            output.Reference(*data);
+            return;
+        } else {
+            ++global_state.hop_i;
+            if (global_state.hop_i != global_state.hop_ids.end()) {
+                global_state.reader->SetVertex(*global_state.hop_i);
+            }
+            DUCKDB_GRAPHAR_LOG_DEBUG("VertexHop finished")
+        }
+    }
+    output.SetCapacity(0);
+}
 //-------------------------------------------------------------------
 // Register
 //-------------------------------------------------------------------
@@ -236,10 +321,8 @@ TableFunction TwoHop::GetFunction() {
     return read_edges;
 }
 
-void TwoHop::Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
-
 TableFunction OneMoreHop::GetFunction() {
-    TableFunction read_edges("one_more_hop", {LogicalType::VARCHAR}, Execute, TwoHop::Bind);
+    TableFunction read_edges("one_more_hop", {LogicalType::VARCHAR}, Execute, OneMoreHop::Bind);
     read_edges.init_global = OneMoreHopGlobalTableFunctionState::Init;
     read_edges.named_parameters["vid"] = LogicalType::INTEGER;
 
@@ -247,6 +330,8 @@ TableFunction OneMoreHop::GetFunction() {
 
     return read_edges;
 }
+
+void TwoHop::Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
 
 void OneMoreHop::Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
 }  // namespace duckdb

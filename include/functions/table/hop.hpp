@@ -4,13 +4,17 @@
 
 #include <duckdb/common/named_parameter_map.hpp>
 #include <duckdb/function/table_function.hpp>
+#include <duckdb/main/extension_util.hpp>
 
 #include <graphar/api/high_level_reader.h>
 #include <graphar/graph_info.h>
 
 namespace duckdb {
 
-class TwoHopBindData final : public TableFunctionData {
+//-------------------------------------------------------------------
+// BindData
+//-------------------------------------------------------------------
+class TwoHopBindData : public TableFunctionData {
 public:
     TwoHopBindData(std::shared_ptr<graphar::EdgeInfo> edge_info, std::string prefix, graphar::IdType src_id)
         : edge_info(edge_info), prefix(prefix), src_id(src_id) {};
@@ -25,6 +29,13 @@ private:
     graphar::IdType src_id;
 };
 
+class FastTwoHopBD final : public TwoHopBindData {
+public:
+    graphar::IdType GetVid() const { return GetSrcId(); }
+};
+//-------------------------------------------------------------------
+// GlobalState
+//-------------------------------------------------------------------
 struct TwoHopGlobalState {
 public:
     TwoHopGlobalState(ClientContext& context, const TwoHopBindData& bind_data)
@@ -61,14 +72,6 @@ private:
     TwoHopGlobalState state;
 };
 
-struct TwoHop {
-    static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
-                                         vector<LogicalType>& return_types, vector<string>& names);
-    static void Execute(ClientContext& context, TableFunctionInput& data, DataChunk& output);
-    static void Register(DatabaseInstance& db);
-    static TableFunction GetFunction();
-};
-
 struct OneMoreHopGlobalState {
 public:
     OneMoreHopGlobalState(ClientContext& context, const TwoHopBindData& bind_data)
@@ -96,10 +99,65 @@ public:
     OneMoreHopGlobalState state;
 };
 
-struct OneMoreHop {
-    static void Execute(ClientContext& context, TableFunctionInput& data, DataChunk& output);
+struct FastTwoHopGS {
+public:
+    FastTwoHopGS(ClientContext& context, const TwoHopBindData& bind_data) {
+        hop_i = hop_ids.begin();
+    };
+
+    void init_iter() {
+        hop_i = hop_ids.begin();
+    }
+
+public:
+    std::set<std::int64_t> hop_ids;
+    bool one_hop = true;
+    std::unique_ptr<LowEdgeReaderByVertex> reader;
+    std::shared_ptr<OffsetReader> offset_reader;
+    std::set<std::int64_t>::const_iterator hop_i;
+};
+
+struct FastTwoHopGTFS : public GlobalTableFunctionState {
+public:
+    FastTwoHopGTFS(ClientContext& context, const TwoHopBindData& bind_data) : state(context, bind_data) {};
+
+    static unique_ptr<GlobalTableFunctionState> Init(ClientContext& context, TableFunctionInitInput& input);
+
+    FastTwoHopGS& GetState() { return state; }
+public:
+    FastTwoHopGS state;
+};
+//-------------------------------------------------------------------
+// Function
+//-------------------------------------------------------------------
+struct TwoHop {
+    static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
+                                         vector<LogicalType>& return_types, vector<string>& names);
+    static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output);
     static void Register(DatabaseInstance& db);
     static TableFunction GetFunction();
+};
+
+struct OneMoreHop {
+    static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
+                                         vector<LogicalType>& return_types, vector<string>& names);
+    static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output);
+    static void Register(DatabaseInstance& db);
+    static TableFunction GetFunction();
+};
+
+struct FastTwoHop {
+    static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
+                                         vector<LogicalType>& return_types, vector<string>& names);
+    static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output);
+    static TableFunction GetFunction() {
+        TableFunction func("fast_two_hop", {LogicalType::VARCHAR}, Execute, TwoHop::Bind);
+        func.init_global = FastTwoHopGTFS::Init;
+        func.named_parameters["vid"] = LogicalType::INTEGER;
+
+        return func;
+    }
+    static void Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
 };
 
 }  // namespace duckdb
