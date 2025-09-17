@@ -192,10 +192,16 @@ jobs:
         run: |
           build/_deps/duckdb-build/test/unittest "[graphar]" --reporter console  || exit 1
 
+      - name: Prepare artifacts for upload
+        run: |
+          mkdir -p upload-artifacts
+          
+          cp build/_deps/duckdb-build/extension/duckdb_graphar/duckdb_graphar.duckdb_extension upload-artifacts/
+          cp build/_deps/duckdb-build/duckdb upload-artifacts/
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: duckdb-graphar-${{ matrix.os }}
-          path: |
-            ./build/_deps/duckdb-build/extension/duckdb_graphar/duckdb_graphar.duckdb_extension
+          path: upload-artifacts
           if-no-files-found: error
