@@ -6,6 +6,3 @@
 	path = extension-ci-tools
 	url = https://github.com/duckdb/extension-ci-tools
 	branch = v1.3.2
-[submodule "incubator-graphar"]
-	path = incubator-graphar
-	url = https://github.com/apache/incubator-graphar
