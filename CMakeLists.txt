@@ -130,6 +130,9 @@ set_target_properties(graphar::graphar_shared PROPERTIES
 add_dependencies(graphar::graphar_shared graphar arrow)
 
 # Set paths for shared libraries
+if (APPLE)
+    list(APPEND EXT_LIBS "-Wl,--disable-new-dtags") # Use rpath for ubuntu build
+endif()
 set(CMAKE_BUILD_RPATH
         "@loader_path"
         "${GRAPHAR_LIB_DIR}"
@@ -214,6 +217,12 @@ endif()
 target_link_libraries(${EXTENSION_NAME} duckdb_static ${EXT_LIBS})
 target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXT_LIBS})
 
+# =============================================
+# Installation
+# =============================================
+log_stage("Installing...")
+
+set(INSTALL_LIB_DIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Library installation directory")
 
 install(TARGETS ${EXTENSION_NAME}
         EXPORT "${DUCKDB_EXPORT_SET}"
