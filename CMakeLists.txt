@@ -189,8 +189,16 @@ log_stage("Building loadable extension")
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 log_done()
 
-target_link_libraries(${EXTENSION_NAME} arrow::arrow_shared graphar::graphar_shared)
-target_link_libraries(${LOADABLE_EXTENSION_NAME} arrow::arrow_shared graphar::graphar_shared)
+set(EXT_LIBS
+        arrow::arrow_shared
+        graphar::graphar_shared)
+
+if (NOT APPLE)
+    list(APPEND EXT_LIBS "-Wl,--disable-new-dtags") # Use rpath for ubuntu build
+endif()
+
+target_link_libraries(${EXTENSION_NAME} ${EXT_LIBS})
+target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXT_LIBS})
 
 
 install(TARGETS ${EXTENSION_NAME}
