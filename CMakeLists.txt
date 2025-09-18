@@ -177,7 +177,7 @@ log_done()
 # config/CMakeLists.txt
 
 project(${TARGET_NAME})
-include_directories(src/include)
+include_directories(src/include ${GRAPHAR_INSTALL_DIR}/include ${GRAPHAR_SOURCE_DIR}/cpp/thirdparty ${arrow_SOURCE_DIR}/cpp/src)
 
 file(GLOB_RECURSE EXTENSION_SOURCES CONFIGURE_DEPENDS "${EXTENSION_ROOT_DIR}/src/*.cpp")
 
