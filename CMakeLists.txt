@@ -44,6 +44,8 @@ set(DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/_deps)
 set(ARROW_INSTALL_DIR ${DEPS_INSTALL_DIR}/arrow-install)
 set(GRAPHAR_INSTALL_DIR ${DEPS_INSTALL_DIR}/graphar-install)
 
+set(GRAPHAR_SOURCE_DIR ${DEPS_INSTALL_DIR}/graphar-src)
+
 set(ARROW_PREFIX_DIR ${DEPS_INSTALL_DIR}/arrow-prefix)
 set(GRAPHAR_PREFIX_DIR ${DEPS_INSTALL_DIR}/graphar-prefix)
 
@@ -188,6 +190,18 @@ log_done()
 log_stage("Building loadable extension")
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 log_done()
+
+set(EXTENSION_INCLUDES
+        $<BUILD_INTERFACE:${EXTENSION_ROOT_DIR}/include>
+        $<BUILD_INTERFACE:${GRAPHAR_INSTALL_DIR}/include>
+        $<BUILD_INTERFACE:${GRAPHAR_SOURCE_DIR}/cpp/thirdparty>
+        $<BUILD_INTERFACE:${duckdb_SOURCE_DIR}/src/include>
+        $<BUILD_INTERFACE:${arrow_SOURCE_DIR}/cpp/src>
+        )
+
+target_include_directories(duckdb_graphar_extension PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(duckdb_graphar_loadable_extension PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
 
 set(EXT_LIBS
         arrow::arrow_shared
