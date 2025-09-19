@@ -5,6 +5,8 @@ set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 set(EXTENSION_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "Extension root directory")
 
+project(${TARGET_NAME})
+
 # =============================================
 # Core Configuration
 # =============================================
@@ -87,6 +89,7 @@ ExternalProject_Add(
         -DARROW_GANDIVA=OFF
         -DARROW_TESTING=OFF
         -DCMAKE_INSTALL_PREFIX=${ARROW_INSTALL_DIR}
+        -DARROW_RPATH_ORIGIN=ON
     BUILD_ALWAYS OFF
     INSTALL_DIR ${ARROW_INSTALL_DIR}
 )
@@ -127,14 +130,12 @@ set_target_properties(graphar::graphar_shared PROPERTIES
     IMPORTED_LOCATION "${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_SHARED_LIBRARY_SUFFIX}"
     BUILD_RPATH "${ARROW_LIB_DIR}"
     INSTALL_RPATH "${ARROW_LIB_DIR}"
+    CMAKE_BUILD_WITH_INSTALL_RPATH TRUE
 )
 
 add_dependencies(graphar::graphar_shared graphar arrow)
 
 # Set paths for shared libraries
-if (APPLE)
-    list(APPEND EXT_LIBS "-Wl,--disable-new-dtags") # Use rpath for ubuntu build
-endif()
 set(CMAKE_BUILD_RPATH
     "@loader_path"
     "${GRAPHAR_LIB_DIR}"
@@ -154,7 +155,6 @@ log_done()
 
 # config/CMakeLists.txt
 
-project(${TARGET_NAME})
 include_directories(src/include ${GRAPHAR_INSTALL_DIR}/include ${GRAPHAR_SOURCE_DIR}/cpp/thirdparty ${arrow_SOURCE_DIR}/cpp/src)
 
 file(GLOB_RECURSE EXTENSION_SOURCES CONFIGURE_DEPENDS "${EXTENSION_ROOT_DIR}/src/*.cpp")
