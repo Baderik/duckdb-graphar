@@ -44,24 +44,24 @@ set(DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/_deps)
 set(ARROW_INSTALL_DIR ${DEPS_INSTALL_DIR}/arrow-install)
 set(GRAPHAR_INSTALL_DIR ${DEPS_INSTALL_DIR}/graphar-install)
 
-set(GRAPHAR_SOURCE_DIR ${DEPS_INSTALL_DIR}/graphar-src)
-
 set(ARROW_PREFIX_DIR ${DEPS_INSTALL_DIR}/arrow-prefix)
 set(GRAPHAR_PREFIX_DIR ${DEPS_INSTALL_DIR}/graphar-prefix)
 
 set(ARROW_LIB_DIR ${ARROW_INSTALL_DIR}/lib)
 set(GRAPHAR_LIB_DIR ${GRAPHAR_INSTALL_DIR}/lib)
 
+set(GRAPHAR_SOURCE_DIR ${DEPS_INSTALL_DIR}/graphar-src)
+
 # Arrow
 log_stage("Configuring Apache Arrow...")
 
 ExternalProject_Add(
-        arrow
-        PREFIX ${ARROW_PREFIX_DIR}
-        GIT_REPOSITORY https://github.com/apache/arrow.git
-        GIT_TAG apache-arrow-17.0.0
-        SOURCE_SUBDIR cpp
-        CMAKE_ARGS
+    arrow
+    PREFIX ${ARROW_PREFIX_DIR}
+    GIT_REPOSITORY https://github.com/apache/arrow.git
+    GIT_TAG apache-arrow-17.0.0
+    SOURCE_SUBDIR cpp
+    CMAKE_ARGS
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         -DARROW_BUILD_SHARED=ON
         -DARROW_BUILD_STATIC=OFF
@@ -87,17 +87,17 @@ ExternalProject_Add(
         -DARROW_GANDIVA=OFF
         -DARROW_TESTING=OFF
         -DCMAKE_INSTALL_PREFIX=${ARROW_INSTALL_DIR}
-        BUILD_ALWAYS OFF
-        INSTALL_DIR ${ARROW_INSTALL_DIR}
+    BUILD_ALWAYS OFF
+    INSTALL_DIR ${ARROW_INSTALL_DIR}
 )
 
 add_library(arrow::arrow_shared SHARED IMPORTED GLOBAL)
 
 file(MAKE_DIRECTORY "${ARROW_INSTALL_DIR}/include")
 set_target_properties(arrow::arrow_shared PROPERTIES
-        IMPORTED_LOCATION "${ARROW_LIB_DIR}/libarrow${CMAKE_SHARED_LIBRARY_SUFFIX}"
-        INTERFACE_INCLUDE_DIRECTORIES ${ARROW_INSTALL_DIR}/include
-        )
+    IMPORTED_LOCATION "${ARROW_LIB_DIR}/libarrow${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    INTERFACE_INCLUDE_DIRECTORIES ${ARROW_INSTALL_DIR}/include
+)
 
 add_dependencies(arrow::arrow_shared arrow)
 
@@ -106,26 +106,28 @@ add_dependencies(arrow::arrow_shared arrow)
 log_stage("Setting up GraphAR...")
 
 ExternalProject_Add(
-        graphar
-        PREFIX ${GRAPHAR_PREFIX_DIR}
-        GIT_REPOSITORY https://github.com/apache/incubator-graphar.git
-        # GIT_TAG main
-        GIT_TAG 1a44bc343e0e846df129c78152f6310a1d678429
-        SOURCE_SUBDIR cpp
-        CMAKE_ARGS
+    graphar
+    PREFIX ${GRAPHAR_PREFIX_DIR}
+    GIT_REPOSITORY https://github.com/apache/incubator-graphar.git
+    # GIT_TAG main
+    GIT_TAG 1a44bc343e0e846df129c78152f6310a1d678429
+    SOURCE_SUBDIR cpp
+    CMAKE_ARGS
         -DCMAKE_INSTALL_PREFIX=${GRAPHAR_INSTALL_DIR}
         -DCMAKE_PREFIX_PATH=${ARROW_INSTALL_DIR}
         -DProtobuf_INCLUDE_DIR=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/include
         -DProtobuf_LIBRARIES=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/lib/libprotobuf.a
-        INSTALL_DIR ${GRAPHAR_INSTALL_DIR}
-        DEPENDS arrow
+    INSTALL_DIR ${GRAPHAR_INSTALL_DIR}
+    DEPENDS arrow
 )
 
 add_library(graphar::graphar_shared SHARED IMPORTED GLOBAL)
 
 set_target_properties(graphar::graphar_shared PROPERTIES
-        IMPORTED_LOCATION "${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_SHARED_LIBRARY_SUFFIX}"
-        )
+    IMPORTED_LOCATION "${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    BUILD_RPATH "${ARROW_LIB_DIR}"
+    INSTALL_RPATH "${ARROW_LIB_DIR}"
+)
 
 add_dependencies(graphar::graphar_shared graphar arrow)
 
@@ -134,50 +136,21 @@ if (APPLE)
     list(APPEND EXT_LIBS "-Wl,--disable-new-dtags") # Use rpath for ubuntu build
 endif()
 set(CMAKE_BUILD_RPATH
-        "@loader_path"
-        "${GRAPHAR_LIB_DIR}"
-        "${ARROW_LIB_DIR}"
-        )
+    "@loader_path"
+    "${GRAPHAR_LIB_DIR}"
+    "${ARROW_LIB_DIR}"
+)
 
 set(CMAKE_INSTALL_RPATH
-        "@loader_path"
-        "${GRAPHAR_LIB_DIR}"
-        "${ARROW_LIB_DIR}"
-        )
+    "@loader_path"
+    "${GRAPHAR_LIB_DIR}"
+    "${ARROW_LIB_DIR}"
+)
 
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 
 log_done()
-
-# DuckDB
-#set(DUCKDB_EXTENSION_CONFIGS "${CMAKE_CURRENT_SOURCE_DIR}/config/extension_config.cmake")
-#
-#log_stage("Declaring DuckDB")
-#if (LOAD_TESTS)  # DuckDB sql logical tests
-#    set(BUILD_UNITTESTS ON CACHE BOOL "")
-#else()
-#    set(BUILD_UNITTESTS OFF CACHE BOOL "")
-#endif()
-#set(ENABLE_SANITIZER OFF CACHE BOOL "")
-#set(ENABLE_UBSAN OFF CACHE BOOL "")
-#set(DISABLE_VPTR_SANITIZER ON CACHE BOOL "")
-#
-#FetchContent_Declare(
-#        duckdb
-#        GIT_REPOSITORY https://github.com/duckdb/duckdb.git
-#        GIT_TAG v1.3.2
-#        GIT_SHALLOW TRUE
-#        GIT_PROGRESS TRUE
-#)
-#log_done()
-#
-#log_stage("Building DuckDB")
-#FetchContent_MakeAvailable(duckdb)
-#log_done()
-
-# Final build steps (DuckDB + extensions) is configured in config/CMakeLists.txt
-
 
 # config/CMakeLists.txt
 
@@ -195,20 +168,21 @@ build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 log_done()
 
 set(EXTENSION_INCLUDES
-        $<BUILD_INTERFACE:${EXTENSION_ROOT_DIR}/include>
-        $<BUILD_INTERFACE:${GRAPHAR_INSTALL_DIR}/include>
-        $<BUILD_INTERFACE:${GRAPHAR_SOURCE_DIR}/cpp/thirdparty>
-        $<BUILD_INTERFACE:${duckdb_SOURCE_DIR}/src/include>
-        $<BUILD_INTERFACE:${arrow_SOURCE_DIR}/cpp/src>
-        )
+    $<BUILD_INTERFACE:${EXTENSION_ROOT_DIR}/include>
+    $<BUILD_INTERFACE:${GRAPHAR_INSTALL_DIR}/include>
+    $<BUILD_INTERFACE:${GRAPHAR_SOURCE_DIR}/cpp/thirdparty>
+    $<BUILD_INTERFACE:${duckdb_SOURCE_DIR}/src/include>
+    $<BUILD_INTERFACE:${arrow_SOURCE_DIR}/cpp/src>
+)
 
 target_include_directories(${EXTENSION_NAME} PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(${LOADABLE_EXTENSION_NAME} PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 
 set(EXT_LIBS
-        arrow::arrow_shared
-        graphar::graphar_shared)
+    arrow::arrow_shared
+    graphar::graphar_shared
+)
 
 if (NOT APPLE)
     list(APPEND EXT_LIBS "-Wl,--disable-new-dtags") # Use rpath for ubuntu build
