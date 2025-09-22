@@ -81,9 +81,10 @@ ExternalProject_Add(
         -DARROW_ORC=ON
         -DARROW_JSON=ON
         -DARROW_CSV=ON
-        -DARROW_WITH_ZLIB=OFF
+        -DARROW_WITH_ZLIB=ON
         -DARROW_WITH_ZSTD=ON
-        -DARROW_WITH_SNAPPY=OFF
+        -DARROW_WITH_SNAPPY=ON
+        -DARROW_OPTIONAL_INSTALL=ON
     INSTALL_DIR ${ARROW_INSTALL_DIR}
     BUILD_BYPRODUCTS ${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX}
 )
@@ -118,6 +119,7 @@ ExternalProject_Add(
         -DProtobuf_INCLUDE_DIR=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/include
         -DProtobuf_LIBRARIES=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/lib/libprotobuf${CMAKE_STATIC_LIBRARY_SUFFIX}
         -DProtobuf_VERSION=21.3.0
+        -DARROW_ORC=ON
     INSTALL_DIR ${GRAPHAR_INSTALL_DIR}
     BUILD_BYPRODUCTS ${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_STATIC_LIBRARY_SUFFIX}
     DEPENDS arrow
@@ -199,7 +201,7 @@ target_include_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${GRAPHAR_INSTALL_
 log_stage("Installing...")
 
 set(INSTALL_LIB_DIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Library installation directory")
-list(APPEND INSTALL_LIB_DIR "${GRAPHAR_LIB_DIR}")
+#list(APPEND INSTALL_LIB_DIR "${GRAPHAR_LIB_DIR}")
 
 install(TARGETS ${EXTENSION_NAME}
         EXPORT "${DUCKDB_EXPORT_SET}"
