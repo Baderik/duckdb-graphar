@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.10)
 
 set(TARGET_NAME duckdb_graphar)
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
@@ -12,12 +12,13 @@ project(${TARGET_NAME})
 # =============================================
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(UNIX AND NOT APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+#    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
 endif()
 
 include(FetchContent)
@@ -61,48 +62,41 @@ ExternalProject_Add(
     arrow
     PREFIX ${ARROW_PREFIX_DIR}
     GIT_REPOSITORY https://github.com/apache/arrow.git
-    GIT_TAG apache-arrow-17.0.0
+    GIT_TAG apache-arrow-21.0.0
     SOURCE_SUBDIR cpp
     CMAKE_ARGS
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-        -DARROW_BUILD_SHARED=ON
-        -DARROW_BUILD_STATIC=OFF
+        -DCMAKE_INSTALL_PREFIX=${ARROW_INSTALL_DIR}
+        -DCMAKE_INSTALL_LIBDIR=${ARROW_INSTALL_DIR}/lib
+        -DCMAKE_INSTALL_INCLUDEDIR=${ARROW_INSTALL_DIR}/include
+        -DCMAKE_INSTALL_BINDIR=${ARROW_INSTALL_DIR}/bin
+        -DARROW_BUILD_SHARED=OFF
+        -DARROW_BUILD_STATIC=ON
         -DARROW_BUILD_TESTS=OFF
-        -DARROW_BUILD_BENCHMARKS=OFF
-        -DARROW_BUILD_EXAMPLES=OFF
         -DARROW_DEPENDENCY_SOURCE=BUNDLED
-        -DARROW_OPTIONAL_INSTALL=ON
         -DARROW_COMPUTE=ON
         -DARROW_DATASET=ON
         -DARROW_FILESYSTEM=ON
-        -DARROW_S3=ON
+        -DARROW_S3=OFF
         -DARROW_PARQUET=ON
         -DARROW_ORC=ON
         -DARROW_JSON=ON
-        -DARROW_WITH_ZLIB=ON
-        -DARROW_WITH_ZSTD=ON
-        -DARROW_WITH_BROTLI=OFF
-        -DARROW_WITH_BZ2=OFF
-        -DARROW_WITH_LZ4=OFF
-        -DARROW_WITH_SNAPPY=ON
         -DARROW_CSV=ON
-        -DARROW_GANDIVA=OFF
-        -DARROW_TESTING=OFF
-        -DCMAKE_INSTALL_PREFIX=${ARROW_INSTALL_DIR}
-        -DARROW_RPATH_ORIGIN=ON
-    BUILD_ALWAYS OFF
+        -DARROW_WITH_ZLIB=OFF
+        -DARROW_WITH_ZSTD=ON
+        -DARROW_WITH_SNAPPY=OFF
     INSTALL_DIR ${ARROW_INSTALL_DIR}
+    BUILD_BYPRODUCTS ${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX}
 )
 
-add_library(arrow::arrow_shared SHARED IMPORTED GLOBAL)
+add_library(arrow::arrow_static STATIC IMPORTED GLOBAL)
 
 file(MAKE_DIRECTORY "${ARROW_INSTALL_DIR}/include")
-set_target_properties(arrow::arrow_shared PROPERTIES
-    IMPORTED_LOCATION "${ARROW_LIB_DIR}/libarrow${CMAKE_SHARED_LIBRARY_SUFFIX}"
+set_target_properties(arrow::arrow_static PROPERTIES
+    IMPORTED_LOCATION "${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX}"
     INTERFACE_INCLUDE_DIRECTORIES ${ARROW_INSTALL_DIR}/include
 )
 
-add_dependencies(arrow::arrow_shared arrow)
+add_dependencies(arrow::arrow_static arrow)
 
 # GraphAr
 
@@ -116,40 +110,32 @@ ExternalProject_Add(
     GIT_TAG 1a44bc343e0e846df129c78152f6310a1d678429
     SOURCE_SUBDIR cpp
     CMAKE_ARGS
-        -DCMAKE_INSTALL_PREFIX=${GRAPHAR_INSTALL_DIR}
+        -DGRAPHAR_BUILD_STATIC=ON
+        -DUSE_STATIC_ARROW=ON
         -DCMAKE_PREFIX_PATH=${ARROW_INSTALL_DIR}
+        -DCMAKE_INSTALL_PREFIX=${GRAPHAR_INSTALL_DIR}
+        -DCMAKE_BUILD_TYPE=Release
         -DProtobuf_INCLUDE_DIR=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/include
-        -DProtobuf_LIBRARIES=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/lib/libprotobuf.a
+        -DProtobuf_LIBRARIES=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/lib/libprotobuf${CMAKE_STATIC_LIBRARY_SUFFIX}
+        -DProtobuf_VERSION=21.3.0
     INSTALL_DIR ${GRAPHAR_INSTALL_DIR}
+    BUILD_BYPRODUCTS ${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_STATIC_LIBRARY_SUFFIX}
     DEPENDS arrow
 )
 
-add_library(graphar::graphar_shared SHARED IMPORTED GLOBAL)
-
-set_target_properties(graphar::graphar_shared PROPERTIES
-    IMPORTED_LOCATION "${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    BUILD_RPATH "${ARROW_LIB_DIR}"
-    INSTALL_RPATH "${ARROW_LIB_DIR}"
-    CMAKE_BUILD_WITH_INSTALL_RPATH TRUE
+# Создаем импортированную цель
+add_library(graphar::graphar_static STATIC IMPORTED)
+set_target_properties(graphar::graphar_static PROPERTIES
+    IMPORTED_LOCATION ${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_STATIC_LIBRARY_SUFFIX}
+    INTERFACE_INCLUDE_DIRECTORIES "${GRAPHAR_INSTALL_DIR}/include"
+    INTERFACE_LINK_LIBRARIES "arrow::arrow_static"
 )
 
-add_dependencies(graphar::graphar_shared graphar arrow)
+# Добавляем зависимость, чтобы GraphAR собирался до основного проекта
+add_dependencies(graphar::graphar_static graphar)
 
-# Set paths for shared libraries
-set(CMAKE_BUILD_RPATH
-    "@loader_path"
-    "${GRAPHAR_LIB_DIR}"
-    "${ARROW_LIB_DIR}"
-)
-
-set(CMAKE_INSTALL_RPATH
-    "@loader_path"
-    "${GRAPHAR_LIB_DIR}"
-    "${ARROW_LIB_DIR}"
-)
-
-set(CMAKE_SKIP_BUILD_RPATH FALSE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+file(MAKE_DIRECTORY ${GRAPHAR_INSTALL_DIR}/include)
+target_include_directories(graphar::graphar_static INTERFACE ${GRAPHAR_INSTALL_DIR}/include)
 
 log_done()
 
@@ -167,29 +153,45 @@ log_stage("Building loadable extension")
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 log_done()
 
-set(EXTENSION_INCLUDES
-    $<BUILD_INTERFACE:${EXTENSION_ROOT_DIR}/include>
-    $<BUILD_INTERFACE:${GRAPHAR_INSTALL_DIR}/include>
-    $<BUILD_INTERFACE:${GRAPHAR_SOURCE_DIR}/cpp/thirdparty>
-    $<BUILD_INTERFACE:${duckdb_SOURCE_DIR}/src/include>
-    $<BUILD_INTERFACE:${arrow_SOURCE_DIR}/cpp/src>
-)
+#set(EXTENSION_INCLUDES
+#    $<BUILD_INTERFACE:${EXTENSION_ROOT_DIR}/include>
+#    $<BUILD_INTERFACE:${GRAPHAR_INSTALL_DIR}/include>
+#    $<BUILD_INTERFACE:${GRAPHAR_SOURCE_DIR}/cpp/thirdparty>
+#    $<BUILD_INTERFACE:${duckdb_SOURCE_DIR}/src/include>
+##    $<BUILD_INTERFACE:${arrow_SOURCE_DIR}/cpp/src>
+#)
 
-target_include_directories(${EXTENSION_NAME} PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_include_directories(${LOADABLE_EXTENSION_NAME} PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+#target_include_directories(${EXTENSION_NAME} PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+#target_include_directories(${LOADABLE_EXTENSION_NAME} PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 
-set(EXT_LIBS
-    arrow::arrow_shared
-    graphar::graphar_shared
-)
+#set(GAR_BUNDLED_DEPS_STATIC_LIBS
+#        gar_arrow_static
+#        gar_parquet_static
+#        gar_dataset_static
+#        gar_acero_static
+#        gar_arrow_bundled_dependencies_static)
+#
+#set(EXT_LIBS
+#    arrow_static
+#    graphar::graphar_static
+#)
 
-if (NOT APPLE)
-    list(APPEND EXT_LIBS "-Wl,--disable-new-dtags") # Use rpath for ubuntu build
-endif()
+#if (NOT APPLE)
+#    list(APPEND EXT_LIBS "-Wl,--disable-new-dtags") # Use rpath for ubuntu build
+#endif()
+#
+#target_link_libraries(${EXTENSION_NAME} duckdb_static ${EXT_LIBS})
+#target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXT_LIBS})
 
-target_link_libraries(${EXTENSION_NAME} duckdb_static ${EXT_LIBS})
-target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXT_LIBS})
+add_dependencies(${EXTENSION_NAME} graphar::graphar_static)
+add_dependencies(${LOADABLE_EXTENSION_NAME} graphar::graphar_static)
+
+target_link_libraries(${EXTENSION_NAME} graphar::graphar_static)
+target_link_libraries(${LOADABLE_EXTENSION_NAME} graphar::graphar_static)
+
+target_include_directories(${EXTENSION_NAME} PRIVATE ${GRAPHAR_INSTALL_DIR}/include)
+target_include_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${GRAPHAR_INSTALL_DIR}/include)
 
 # =============================================
 # Installation
@@ -197,6 +199,7 @@ target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXT_LIBS})
 log_stage("Installing...")
 
 set(INSTALL_LIB_DIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Library installation directory")
+list(APPEND INSTALL_LIB_DIR "${GRAPHAR_LIB_DIR}")
 
 install(TARGETS ${EXTENSION_NAME}
         EXPORT "${DUCKDB_EXPORT_SET}"
