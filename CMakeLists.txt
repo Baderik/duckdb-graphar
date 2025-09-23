@@ -119,6 +119,8 @@ ExternalProject_Add(
         -DProtobuf_INCLUDE_DIR=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/include
         -DProtobuf_LIBRARIES=${ARROW_PREFIX_DIR}/src/arrow-build/protobuf_ep-install/lib/libprotobuf${CMAKE_STATIC_LIBRARY_SUFFIX}
         -DProtobuf_VERSION=21.3.0
+        -DCMAKE_CXX_FLAGS=-fPIC
+        -DCMAKE_C_FLAGS=-fPIC
         -DARROW_ORC=ON
     INSTALL_DIR ${GRAPHAR_INSTALL_DIR}
     BUILD_BYPRODUCTS ${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_STATIC_LIBRARY_SUFFIX}
@@ -161,7 +163,6 @@ add_dependencies(${LOADABLE_EXTENSION_NAME} arrow::arrow_static graphar::graphar
 target_link_libraries(${EXTENSION_NAME}
         graphar::graphar_static
 
-        ${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX}
         ${ARROW_LIB_DIR}/libarrow_acero${CMAKE_STATIC_LIBRARY_SUFFIX}
         ${ARROW_LIB_DIR}/libarrow_bundled_dependencies${CMAKE_STATIC_LIBRARY_SUFFIX}
         ${ARROW_LIB_DIR}/libarrow_compute${CMAKE_STATIC_LIBRARY_SUFFIX}
@@ -171,7 +172,6 @@ target_link_libraries(${EXTENSION_NAME}
 target_link_libraries(${LOADABLE_EXTENSION_NAME}
         graphar::graphar_static
 
-        ${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX}
         ${ARROW_LIB_DIR}/libarrow_acero${CMAKE_STATIC_LIBRARY_SUFFIX}
         ${ARROW_LIB_DIR}/libarrow_bundled_dependencies${CMAKE_STATIC_LIBRARY_SUFFIX}
         ${ARROW_LIB_DIR}/libarrow_compute${CMAKE_STATIC_LIBRARY_SUFFIX}
