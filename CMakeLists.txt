@@ -86,7 +86,7 @@ ExternalProject_Add(
         -DARROW_WITH_SNAPPY=ON
         -DARROW_OPTIONAL_INSTALL=ON
     INSTALL_DIR ${ARROW_INSTALL_DIR}
-    BUILD_BYPRODUCTS ${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX}
+    BUILD_BYPRODUCTS ${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX} ${ARROW_LIB_DIR}/libarrow_acero${CMAKE_STATIC_LIBRARY_SUFFIX} ${ARROW_LIB_DIR}/libarrow_bundled_dependencies${CMAKE_STATIC_LIBRARY_SUFFIX} ${ARROW_LIB_DIR}/libarrow_compute${CMAKE_STATIC_LIBRARY_SUFFIX} ${ARROW_LIB_DIR}/libarrow_dataset${CMAKE_STATIC_LIBRARY_SUFFIX} ${ARROW_LIB_DIR}/libparquet${CMAKE_STATIC_LIBRARY_SUFFIX}
 )
 
 add_library(arrow::arrow_static STATIC IMPORTED GLOBAL)
@@ -125,7 +125,6 @@ ExternalProject_Add(
     DEPENDS arrow
 )
 
-# Создаем импортированную цель
 add_library(graphar::graphar_static STATIC IMPORTED)
 set_target_properties(graphar::graphar_static PROPERTIES
     IMPORTED_LOCATION ${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_STATIC_LIBRARY_SUFFIX}
@@ -133,7 +132,6 @@ set_target_properties(graphar::graphar_static PROPERTIES
     INTERFACE_LINK_LIBRARIES "arrow::arrow_static"
 )
 
-# Добавляем зависимость, чтобы GraphAR собирался до основного проекта
 add_dependencies(graphar::graphar_static graphar)
 
 file(MAKE_DIRECTORY ${GRAPHAR_INSTALL_DIR}/include)
@@ -155,42 +153,30 @@ log_stage("Building loadable extension")
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 log_done()
 
-#set(EXTENSION_INCLUDES
-#    $<BUILD_INTERFACE:${EXTENSION_ROOT_DIR}/include>
-#    $<BUILD_INTERFACE:${GRAPHAR_INSTALL_DIR}/include>
-#    $<BUILD_INTERFACE:${GRAPHAR_SOURCE_DIR}/cpp/thirdparty>
-#    $<BUILD_INTERFACE:${duckdb_SOURCE_DIR}/src/include>
-##    $<BUILD_INTERFACE:${arrow_SOURCE_DIR}/cpp/src>
-#)
 
-#target_include_directories(${EXTENSION_NAME} PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-#target_include_directories(${LOADABLE_EXTENSION_NAME} PUBLIC ${EXTENSION_INCLUDES} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+add_dependencies(${EXTENSION_NAME} arrow::arrow_static graphar::graphar_static)
+add_dependencies(${LOADABLE_EXTENSION_NAME} arrow::arrow_static graphar::graphar_static)
 
+target_link_libraries(${EXTENSION_NAME}
+        graphar::graphar_static
 
-#set(GAR_BUNDLED_DEPS_STATIC_LIBS
-#        gar_arrow_static
-#        gar_parquet_static
-#        gar_dataset_static
-#        gar_acero_static
-#        gar_arrow_bundled_dependencies_static)
-#
-#set(EXT_LIBS
-#    arrow_static
-#    graphar::graphar_static
-#)
+        ${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libarrow_acero${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libarrow_bundled_dependencies${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libarrow_compute${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libarrow_dataset${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libparquet${CMAKE_STATIC_LIBRARY_SUFFIX}
+        )
+target_link_libraries(${LOADABLE_EXTENSION_NAME}
+        graphar::graphar_static
 
-#if (NOT APPLE)
-#    list(APPEND EXT_LIBS "-Wl,--disable-new-dtags") # Use rpath for ubuntu build
-#endif()
-#
-#target_link_libraries(${EXTENSION_NAME} duckdb_static ${EXT_LIBS})
-#target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXT_LIBS})
-
-add_dependencies(${EXTENSION_NAME} graphar::graphar_static)
-add_dependencies(${LOADABLE_EXTENSION_NAME} graphar::graphar_static)
-
-target_link_libraries(${EXTENSION_NAME} graphar::graphar_static)
-target_link_libraries(${LOADABLE_EXTENSION_NAME} graphar::graphar_static)
+        ${ARROW_LIB_DIR}/libarrow${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libarrow_acero${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libarrow_bundled_dependencies${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libarrow_compute${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libarrow_dataset${CMAKE_STATIC_LIBRARY_SUFFIX}
+        ${ARROW_LIB_DIR}/libparquet${CMAKE_STATIC_LIBRARY_SUFFIX}
+        )
 
 target_include_directories(${EXTENSION_NAME} PRIVATE ${GRAPHAR_INSTALL_DIR}/include)
 target_include_directories(${LOADABLE_EXTENSION_NAME} PRIVATE ${GRAPHAR_INSTALL_DIR}/include)
