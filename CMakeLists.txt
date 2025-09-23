@@ -130,6 +130,7 @@ set_target_properties(graphar::graphar_static PROPERTIES
     IMPORTED_LOCATION ${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_STATIC_LIBRARY_SUFFIX}
     INTERFACE_INCLUDE_DIRECTORIES "${GRAPHAR_INSTALL_DIR}/include"
     INTERFACE_LINK_LIBRARIES "arrow::arrow_static"
+    POSITION_INDEPENDENT_CODE ON
 )
 
 add_dependencies(graphar::graphar_static graphar)
