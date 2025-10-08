@@ -1,3 +1,4 @@
+export CMAKE_POLICY_VERSION_MINIMUM=3.5
 PROJ_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Configuration of extension
