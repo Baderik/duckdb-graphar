@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 
 set(TARGET_NAME duckdb_graphar)
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
@@ -24,6 +24,9 @@ endif()
 include(FetchContent)
 include(GNUInstallDirs)
 include(ExternalProject)
+
+option(LOAD_TESTS "Build extension tests" OFF)
+option(SHOW_LOG_STAGES "Display progress logs for each stage" ON)
 
 # =============================================
 # Progress Reporting Functions
@@ -157,18 +160,17 @@ ExternalProject_Add(
 )
 
 add_library(graphar::graphar_shared SHARED IMPORTED GLOBAL)
+
 set_target_properties(graphar::graphar_shared PROPERTIES
-        IMPORTED_LOCATION "${GRAPHAR_LIB_FILE}"
-        INTERFACE_INCLUDE_DIRECTORIES "${GRAPHAR_INSTALL_DIR}/include"
-        INTERFACE_LINK_LIBRARIES "arrow::arrow_shared"
-        POSITION_INDEPENDENT_CODE ON
-        )
+  IMPORTED_LOCATION "${GRAPHAR_LIB_DIR}/libgraphar${CMAKE_SHARED_LIBRARY_SUFFIX}"
+)
 
 add_dependencies(graphar::graphar_shared graphar arrow)
 
 file(MAKE_DIRECTORY ${GRAPHAR_INSTALL_DIR}/include)
 target_include_directories(graphar::graphar_shared INTERFACE ${GRAPHAR_INSTALL_DIR}/include)
 
+# Set paths for shared libraries
 if(APPLE)
     set(RPATH_ORIGIN "@loader_path")
 else()
@@ -176,16 +178,16 @@ else()
 endif()
 
 set(CMAKE_BUILD_RPATH
-        "${RPATH_ORIGIN}"
-        "${GRAPHAR_LIB_DIR}"
-        "${ARROW_LIB_DIR}"
-        )
+    "${RPATH_ORIGIN}"
+    "${GRAPHAR_LIB_DIR}"
+    "${ARROW_LIB_DIR}"
+)
 
 set(CMAKE_INSTALL_RPATH
-        "${RPATH_ORIGIN}"
-        "${GRAPHAR_LIB_DIR}"
-        "${ARROW_LIB_DIR}"
-        )
+    "${RPATH_ORIGIN}"
+    "${GRAPHAR_LIB_DIR}"
+    "${ARROW_LIB_DIR}"
+)
 
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)

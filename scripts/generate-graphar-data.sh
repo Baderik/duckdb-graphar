@@ -45,3 +45,5 @@ vertices=$(find "$GRAPH_RESULT_DIR" -maxdepth 1 -type f -name "*vertex*" -exec b
 
     echo "version: gar/v1"
 } > "$GRAPH_INFO_FILE"
+
+echo "Successfully prepared test data."

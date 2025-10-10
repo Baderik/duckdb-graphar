@@ -29,53 +29,54 @@ jobs:
               - Minor change: "MINOR description"`);
             }
 
+  lint:
+    name: C++ Style Check
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install clang-format-19
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19 all
+          sudo apt-get install -y clang-format-19
+
+      - name: Verify C++ Code Style
+        run: |
+          find src/ include/ -name '*.cpp' -o -name '*.hpp' | xargs clang-format-19 --dry-run -Werror
+
   build:
     name: ${{ matrix.os }} Build and Test
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
-
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-22.04, macos-14]
-        include:
-          - os: ubuntu-22.04
-            ccache_dir: ~/.ccache
-            deps_command: |
-              sudo apt-get update -qq
-              sudo apt-get install -y --no-install-recommends \
-                build-essential \
-                cmake \
-                curl \
-                libcurl4-openssl-dev \
-                zlib1g-dev \
-                libzstd-dev \
-                libsnappy-dev \
-                ccache
-
-          - os: macos-14
-            ccache_path: /opt/homebrew/opt/ccache/libexec
-            deps_command: |
-              brew update
-              brew install curl ccache
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install clang-format
+      - name: Install System Dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          echo "::group::Installing CLang Format"
-          sudo apt-get update
-          sudo apt-get install clang-format-15
-          echo "::endgroup::"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake curl libcurl4-openssl-dev zlib1g-dev \
+            libzstd-dev libsnappy-dev ccache python3-pip
 
-      - name: Check C++ Code Style
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          echo "::group::Checking C++ Code Style"
-          find src/ src/include/ -name '*.cpp' -o -name '*.hpp' | xargs clang-format-15 --dry-run
-          echo "::endgroup::"
+      - name: Install System Dependencies (macOS)
+        if: matrix.os == 'macos-14'
+        run: brew install ccache
+
+      - name: Set up specific CMake version (macOS)
+        if: matrix.os == 'macos-14'
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.28.3'
 
       - name: Set up ccache
         run: |
@@ -92,105 +93,117 @@ jobs:
           path: |
             ${{ matrix.ccache_dir }}
             build/_deps
-          key: ${{ runner.os }}-deps-ubuntu-22-${{ hashFiles('CMakeLists.txt') }}
+          key: ${{ runner.os }}-deps-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-deps-ubuntu-22
+            ${{ runner.os }}-deps
 
-      - name: Install System Dependencies
+      - name: Configure CMake
         run: |
-          echo "::group::Installing dependencies"
-          ${{ matrix.deps_command }}
-          echo "::endgroup::"
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DLOAD_TESTS=ON ..
 
       - name: Build
         run: |
-          make -j$(getconf _NPROCESSORS_ONLN)
+          cd build
+          make -j$(nproc)
 
-      - name: Install GraphAr CLI
+      - name: Install GraphAr CLI and Generate Data
         if: matrix.os == 'ubuntu-22.04'
         run: |
+          set -euxo pipefail
+
           pip3 install --upgrade pip
-          install_cli() {
-            set -euxo pipefail
-            local ROOT_DIR=$(pwd)
-            local DEPS_DIR=$ROOT_DIR/build/_deps
-            local ARROW_INSTALL_DIR=$DEPS_DIR/arrow-install
-            local ARROW_BUILD_DIR=$DEPS_DIR/arrow-prefix/src/arrow-build
-            local PROTOBUF_INSTALL_DIR=$ARROW_BUILD_DIR/protobuf_ep-install
-            local GRAPHAR_CLI_DIR=$DEPS_DIR/graphar-prefix/src/graphar/cli
-            
-            local CMAKE_ARGS=(
-              --config-settings=cmake.define.Arrow_DIR="$ARROW_INSTALL_DIR/lib/cmake/Arrow"
-              --config-settings=cmake.define.Parquet_DIR="$ARROW_INSTALL_DIR/lib/cmake/Parquet"
-              --config-settings=cmake.define.ArrowDataset_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowDataset"
-              --config-settings=cmake.define.ArrowAcero_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowAcero"
-              --config-settings=cmake.define.Protobuf_INCLUDE_DIR="$PROTOBUF_INSTALL_DIR/include"
-              --config-settings=cmake.define.Protobuf_LIBRARIES="$PROTOBUF_INSTALL_DIR/lib/libprotobuf.a"
-              --config-settings=cmake.define.CMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
-            )
-            
-            pip3 install "$GRAPHAR_CLI_DIR" "${CMAKE_ARGS[@]}"
-          }
-          install_cli
 
-      - name: Generate GraphAr data
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          generate_graphar_data() {
-            set -euxo pipefail
-            local ROOT_DIR=$(pwd)
-  
-            local GRAPH_DIR=$ROOT_DIR/data/snap-musae-github
-            local GRAPH_IMPORT_TEMPLATE=$GRAPH_DIR/import.script.git.yaml
-            local GRAPH_IMPORT=$GRAPH_DIR/import.git.yaml
-            local GRAPH_RESULT_DIR=$GRAPH_DIR/graphar
-            mkdir -p "$GRAPH_RESULT_DIR"
-            cp "$GRAPH_IMPORT_TEMPLATE" "$GRAPH_IMPORT"
-            sed -i "s|\$DIR_PATH|$GRAPH_DIR|g" "$GRAPH_IMPORT"
-          
-            graphar import -c "$GRAPH_IMPORT"
-            rm "$GRAPH_IMPORT"
+          ROOT_DIR=$(pwd)
+          DEPS_DIR=$ROOT_DIR/build/_deps
+          ARROW_INSTALL_DIR=$DEPS_DIR/arrow-install
+          ARROW_BUILD_DIR=$DEPS_DIR/arrow-prefix/src/arrow-build
+          PROTOBUF_INSTALL_DIR=$ARROW_BUILD_DIR/protobuf_ep-install
+          GRAPHAR_CLI_DIR=$DEPS_DIR/graphar-prefix/src/graphar/cli
 
-            local GRAPH_NAME=$(grep "name:" "$GRAPH_IMPORT_TEMPLATE" | head -n1 | sed 's/^[^:]*:[[:space:]]*//')
-            local GRAPH_INFO_FILE=$GRAPH_RESULT_DIR/$GRAPH_NAME.graph.yaml
-  
-            local edges=$(find "$GRAPH_RESULT_DIR" -maxdepth 1 -type f -name "*edge*" -exec basename {} \;)
-            local vertices=$(find "$GRAPH_RESULT_DIR" -maxdepth 1 -type f -name "*vertex*" -exec basename {} \;)
-            
-            {
-              echo "edges:"
-              for edge in "${edges[@]}"; do
-              echo "  - $edge"
-              done
-          
-              echo "name: $GRAPH_NAME"
-          
-              echo "vertices:"
-              for vertex in "${vertices[@]}"; do
-              echo "  - $vertex"
-              done
-          
-              echo "version: gar/v1"
-            } > "$GRAPH_INFO_FILE"
-          }
-          generate_graphar_data
+          CMAKE_ARGS=(
+            --config-settings=cmake.define.Arrow_DIR="$ARROW_INSTALL_DIR/lib/cmake/Arrow"
+            --config-settings=cmake.define.Parquet_DIR="$ARROW_INSTALL_DIR/lib/cmake/Parquet"
+            --config-settings=cmake.define.ArrowDataset_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowDataset"
+            --config-settings=cmake.define.ArrowAcero_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowAcero"
+            --config-settings=cmake.define.Protobuf_INCLUDE_DIR="$PROTOBUF_INSTALL_DIR/include"
+            --config-settings=cmake.define.Protobuf_LIBRARIES="$PROTOBUF_INSTALL_DIR/lib/libprotobuf.a"
+            --config-settings=cmake.define.CMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
+          )
+          pip3 install "$GRAPHAR_CLI_DIR" "${CMAKE_ARGS[@]}"
+
+          GRAPH_DIR=$ROOT_DIR/data/snap-musae-github
+          GRAPH_IMPORT_TEMPLATE=$GRAPH_DIR/import.script.git.yaml
+          GRAPH_IMPORT=$GRAPH_DIR/import.git.yaml
+          GRAPH_RESULT_DIR=$GRAPH_DIR/graphar
+
+          mkdir -p "$GRAPH_RESULT_DIR"
+          cp "$GRAPH_IMPORT_TEMPLATE" "$GRAPH_IMPORT"
+          sed -i "s|\$DIR_PATH|$GRAPH_DIR|g" "$GRAPH_IMPORT"
+
+          graphar import -c "$GRAPH_IMPORT"
+          rm "$GRAPH_IMPORT"
+
+          GRAPH_NAME=$(grep "name:" "$GRAPH_IMPORT_TEMPLATE" | head -n1 | sed 's/^[^:]*:[[:space:]]*//')
+          GRAPH_INFO_FILE=$GRAPH_RESULT_DIR/$GRAPH_NAME.graph.yaml
+
+          readarray -t edges < <(find "$GRAPH_RESULT_DIR" -maxdepth 1 -type f -name "*edge*" -exec basename {} \;)
+          readarray -t vertices < <(find "$GRAPH_RESULT_DIR" -maxdepth 1 -type f -name "*vertex*" -exec basename {} \;)
+
+          {
+            echo "edges:"
+            for edge in "${edges[@]}"; do echo "  - $edge"; done
+            echo "name: $GRAPH_NAME"
+            echo "vertices:"
+            for vertex in "${vertices[@]}"; do echo "  - $vertex"; done
+            echo "version: gar/v1"
+          } > "$GRAPH_INFO_FILE"
 
       - name: Run Tests
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          build/release/test/unittest "[graphar]" --reporter console  || exit 1
-        
-      - name: Prepare artifacts for upload
+          build/_deps/duckdb-build/test/unittest "[graphar]" --reporter console || exit 1
+
+      - name: Prepare Artifacts for Upload
         run: |
           mkdir -p upload-artifacts
-          
-          cp build/release/extension/duckdb_graphar/duckdb_graphar.duckdb_extension upload-artifacts/
-          cp build/release/duckdb upload-artifacts/
 
+          cp build/_deps/duckdb-build/duckdb upload-artifacts/
+          cp build/_deps/duckdb-build/extension/duckdb_graphar/duckdb_graphar.duckdb_extension upload-artifacts/
 
-      - name: Upload build artifacts
+          if [ "${{ matrix.os }}" == "macos-14" ]; then
+            cp ./build/_deps/arrow-install/lib/libarrow.1700.dylib upload-artifacts/
+            cp ./build/_deps/arrow-install/lib/libarrow_dataset.1700.dylib upload-artifacts/
+            cp ./build/_deps/arrow-install/lib/libarrow_acero.1700.dylib upload-artifacts/
+            cp ./build/_deps/arrow-install/lib/libparquet.1700.dylib upload-artifacts/
+
+            cp ./build/_deps/graphar-install/lib/libgraphar.dylib upload-artifacts/
+          else
+            cp ./build/_deps/arrow-install/lib/libarrow.so.1700 upload-artifacts/
+            cp ./build/_deps/arrow-install/lib/libarrow_dataset.so.1700 upload-artifacts/
+            cp ./build/_deps/arrow-install/lib/libarrow_acero.so.1700 upload-artifacts/
+            cp ./build/_deps/arrow-install/lib/libparquet.so.1700 upload-artifacts/
+
+            cp ./build/_deps/graphar-install/lib/libgraphar.so upload-artifacts/
+          fi
+
+          cat <<'EOF' > upload-artifacts/run_duckdb.sh
+          #!/bin/bash
+          SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+          if [[ "$(uname)" == "Darwin" ]]; then
+            export DYLD_LIBRARY_PATH="$SCRIPT_DIR:$DYLD_LIBRARY_PATH"
+          else
+            export LD_LIBRARY_PATH="$SCRIPT_DIR:$LD_LIBRARY_PATH"
+          fi
+          "$SCRIPT_DIR/duckdb" "$@"
+          EOF
+          chmod +x upload-artifacts/run_duckdb.sh
+
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: duckdb-graphar-${{ matrix.os }}
           path: upload-artifacts
           if-no-files-found: error
+

@@ -6,7 +6,6 @@
 #include <duckdb/common/exception.hpp>
 #include <duckdb/common/string_util.hpp>
 #include <duckdb/function/scalar_function.hpp>
-#include <duckdb/main/extension_util.hpp>
 
 #include <graphar/graph_info.h>
 #include <graphar/high-level/graph_reader.h>
@@ -97,7 +96,7 @@ void Bfs::WayLength(DataChunk& args, ExpressionState& state, Vector& result) {
 
         DUCKDB_GRAPHAR_LOG_DEBUG("BFS start: " + std::to_string(start) + "->" + std::to_string(aim));
 
-        std::vector<int16_t> visited(vert_num, -1);
+        std::vector<int64_t> visited(vert_num, -1);
         std::queue<int64_t> q;
         q.push(start);
         visited[start] = 0;
@@ -147,15 +146,17 @@ void Bfs::WayExists(DataChunk& args, ExpressionState& state, Vector& result) {
     DUCKDB_GRAPHAR_LOG_TRACE("Running auxiliary Bfs::WayLength function");
 
     const auto number = args.size();
-    auto result_temp = Vector(LogicalType::BIGINT, true, true, number);
-    Bfs::WayLength(args, state, result_temp);
+    auto distance_vector = Vector(LogicalType::BIGINT, true, true, number);
+    Bfs::WayLength(args, state, distance_vector);
 
     DUCKDB_GRAPHAR_LOG_DEBUG("Bfs::WayLength finished. Converting to boolean");
 
-    auto result_data = FlatVector::GetData<long long>(result);
+    const int64_t* distance_data = FlatVector::GetData<int64_t>(distance_vector);
+    auto result_data = FlatVector::GetData<bool>(result);
     for (idx_t i = 0; i < number; i++) {
-        result_data[i] = (result_data[i] != -1);
+        result_data[i] = (distance_data[i] != -1);
     }
+
     DUCKDB_GRAPHAR_LOG_DEBUG("Converting finished");
     if (time_logging) {
         t.print();
@@ -176,8 +177,8 @@ ScalarFunction Bfs::GetFunctionLength() {
     return bfs_length;
 }
 
-void Bfs::Register(DatabaseInstance& db) {
-    ExtensionUtil::RegisterFunction(db, GetFunctionExists());
-    ExtensionUtil::RegisterFunction(db, GetFunctionLength());
+void Bfs::Register(ExtensionLoader& loader) {
+    loader.RegisterFunction(GetFunctionExists());
+    loader.RegisterFunction(GetFunctionLength());
 }
 }  // namespace duckdb
