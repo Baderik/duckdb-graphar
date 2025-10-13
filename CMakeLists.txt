@@ -7,6 +7,14 @@ set(EXTENSION_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "Extension root 
 
 project(${TARGET_NAME})
 
+if(ARROW_ROOT)
+    list(APPEND CMAKE_PREFIX_PATH ${ARROW_ROOT})
+endif()
+
+if(GRAPHAR_ROOT)
+    list(APPEND CMAKE_PREFIX_PATH ${GRAPHAR_ROOT})
+endif()
+
 find_package(CURL REQUIRED)
 find_package(Arrow REQUIRED)
 
