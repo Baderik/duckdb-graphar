@@ -196,7 +196,7 @@ log_done()
 
 # config/CMakeLists.txt
 
-include_directories(src/include)
+include_directories(include)
 
 file(GLOB_RECURSE EXTENSION_SOURCES CONFIGURE_DEPENDS "${EXTENSION_ROOT_DIR}/src/*.cpp")
 
@@ -221,7 +221,7 @@ if (NOT APPLE)
 endif()
 
 set(EXTENSION_INCLUDES
-        $<BUILD_INTERFACE:${EXTENSION_ROOT_DIR}/src/include>
+        $<BUILD_INTERFACE:${EXTENSION_ROOT_DIR}/include>
         $<BUILD_INTERFACE:${GRAPHAR_INSTALL_DIR}/include>
         $<BUILD_INTERFACE:${GRAPHAR_SOURCE_DIR}/cpp/thirdparty>
         $<BUILD_INTERFACE:${duckdb_SOURCE_DIR}/src/include>
