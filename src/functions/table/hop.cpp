@@ -7,7 +7,6 @@
 #include <duckdb/common/named_parameter_map.hpp>
 #include <duckdb/common/vector_size.hpp>
 #include <duckdb/function/table_function.hpp>
-#include <duckdb/main/extension_util.hpp>
 
 #include <graphar/api/high_level_reader.h>
 
@@ -330,8 +329,17 @@ TableFunction OneMoreHop::GetFunction() {
 
     return read_edges;
 }
+TableFunction FastTwoHop::GetFunction() {
+    TableFunction func("fast_two_hop", {LogicalType::VARCHAR}, Execute, TwoHop::Bind);
+    func.init_global = FastTwoHopGTFS::Init;
+    func.named_parameters["vid"] = LogicalType::INTEGER;
 
-void TwoHop::Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
+    return func;
+}
 
-void OneMoreHop::Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
+void TwoHop::Register(ExtensionLoader& loader) { loader.RegisterFunction(GetFunction()); }
+
+void OneMoreHop::Register(ExtensionLoader& loader) { loader.RegisterFunction(GetFunction()); }
+
+void FastTwoHop::Register(ExtensionLoader& loader) { loader.RegisterFunction(GetFunction()); }
 }  // namespace duckdb

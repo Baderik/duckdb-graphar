@@ -8,7 +8,6 @@
 #include <duckdb/common/named_parameter_map.hpp>
 #include <duckdb/function/table/arrow.hpp>
 #include <duckdb/function/table_function.hpp>
-#include <duckdb/main/extension_util.hpp>
 
 #include <graphar/api/arrow_reader.h>
 #include <graphar/api/high_level_reader.h>
@@ -16,7 +15,6 @@
 #include <graphar/expression.h>
 #include <graphar/fwd.h>
 
-#include <cassert>
 #include <iostream>
 
 namespace duckdb {
@@ -44,7 +42,7 @@ unique_ptr<FunctionData> ReadEdges::Bind(ClientContext& context, TableFunctionBi
     const std::string dst_type = StringValue::Get(input.named_parameters.at("dst"));
     const std::string e_type = StringValue::Get(input.named_parameters.at("type"));
 
-    DUCKDB_GRAPHAR_LOG_DEBUG(src_type + "--" + e_type + "->" + dst_type + " Load Graph Info and Edge Info");
+    DUCKDB_GRAPHAR_LOG_DEBUG(src_type + "--" + e_type + "->" + dst_type + "\nLoad Graph Info and Edge Info");
 
     auto bind_data = make_uniq<ReadBindData>();
     DUCKDB_GRAPHAR_LOG_DEBUG("file path " + file_path);
@@ -92,18 +90,22 @@ std::shared_ptr<Reader> ReadEdges::GetReader(ReadBaseGlobalTableFunctionState& g
     }
     if (ind == 0) {
         DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetReader: making src and dst reader...");
-        auto maybe_reader = graphar::AdjListChunkInfoReader::Make(
+        auto maybe_reader = graphar::AdjListArrowChunkReader::Make(
             bind_data.graph_info, bind_data.params[0], bind_data.params[1], bind_data.params[2], adj_list_type);
-        assert(maybe_reader.status().ok());
+        if (maybe_reader.has_error()) {
+            throw std::runtime_error("Failed to make adj list reader: " + maybe_reader.error().message());
+        }
         Reader result = *maybe_reader.value();
         DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetReader: returning...");
         return std::make_shared<Reader>(std::move(result));
     }
     DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetReader: making property reader...");
     auto maybe_reader =
-        graphar::AdjListPropertyChunkInfoReader::Make(bind_data.graph_info, bind_data.params[0], bind_data.params[1],
-                                                      bind_data.params[2], bind_data.pgs[ind - 1], adj_list_type);
-    assert(maybe_reader.status().ok());
+        graphar::AdjListPropertyArrowChunkReader::Make(bind_data.graph_info, bind_data.params[0], bind_data.params[1],
+                                                       bind_data.params[2], bind_data.pgs[ind - 1], adj_list_type);
+    if (maybe_reader.has_error()) {
+        throw std::runtime_error("Failed to make adj list property reader: " + maybe_reader.error().message());
+    }
     Reader result = *maybe_reader.value();
     DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetReader: returning...");
     return std::make_shared<Reader>(std::move(result));
@@ -116,25 +118,36 @@ void ReadEdges::SetFilter(ReadBaseGlobalTableFunctionState& gstate, ReadBindData
     DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::SetFilter");
     if (filter_column == "") {
         return;
-    } else if (filter_column != SRC_GID_COLUMN && filter_column != DST_GID_COLUMN) {
+    }
+    auto edge_info = bind_data.graph_info->GetEdgeInfo(bind_data.params[0], bind_data.params[1], bind_data.params[2]);
+    std::shared_ptr<graphar::AdjListOffsetArrowChunkReader> offset_reader = nullptr;
+    if (filter_column == SRC_GID_COLUMN) {
+        offset_reader =
+            graphar::AdjListOffsetArrowChunkReader::Make(bind_data.graph_info, bind_data.params[0], bind_data.params[1],
+                                                         bind_data.params[2], graphar::AdjListType::ordered_by_source)
+                .value();
+    } else if (filter_column == DST_GID_COLUMN) {
+        offset_reader =
+            graphar::AdjListOffsetArrowChunkReader::Make(bind_data.graph_info, bind_data.params[0], bind_data.params[1],
+                                                         bind_data.params[2], graphar::AdjListType::ordered_by_dest)
+                .value();
+    } else {
         throw NotImplementedException("Only src and dst filters are supported");
     }
-    ScopedTimer t("SetFilter");
     graphar::IdType vid = std::stoll(filter_value);
-    int64_t vertex_num = 0;
-    if (filter_column == SRC_GID_COLUMN) {
-        vertex_num = GraphArFunctions::GetVertexNum(bind_data.graph_info, bind_data.params[0]);
-    } else {
-        vertex_num = GraphArFunctions::GetVertexNum(bind_data.graph_info, bind_data.params[2]);
-    }
+    const int64_t vertex_num = (filter_column == SRC_GID_COLUMN)
+                                   ? GraphArFunctions::GetVertexNum(bind_data.graph_info, bind_data.params[0])
+                                   : GraphArFunctions::GetVertexNum(bind_data.graph_info, bind_data.params[2]);
     if (vid < 0 or vid >= vertex_num) {
         throw BinderException("Vertex id is out of range");
     }
-    t.print("vid check");
+    offset_reader->seek(vid);
     for (idx_t i = 0; i < gstate.readers.size(); ++i) {
         seek_vid(*gstate.readers[i], vid, filter_column);
-        t.print("seek_vid");
     }
+    const auto offset_arr = offset_reader->GetChunk().value();
+    gstate.filter_range.first = 0;
+    gstate.filter_range.second = GetInt64Value(offset_arr, 1) - GetInt64Value(offset_arr, 0);
     DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::SetFilter: finished");
 }
 //-------------------------------------------------------------------

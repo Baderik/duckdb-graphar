@@ -4,7 +4,7 @@
 
 #include <duckdb/common/named_parameter_map.hpp>
 #include <duckdb/function/table_function.hpp>
-#include <duckdb/main/extension_util.hpp>
+#include <duckdb/main/extension/extension_loader.hpp>
 
 #include <graphar/api/high_level_reader.h>
 #include <graphar/graph_info.h>
@@ -134,7 +134,7 @@ struct TwoHop {
     static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
                                          vector<LogicalType>& return_types, vector<string>& names);
     static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output);
-    static void Register(DatabaseInstance& db);
+    static void Register(ExtensionLoader& loader);
     static TableFunction GetFunction();
 };
 
@@ -142,7 +142,7 @@ struct OneMoreHop {
     static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
                                          vector<LogicalType>& return_types, vector<string>& names);
     static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output);
-    static void Register(DatabaseInstance& db);
+    static void Register(ExtensionLoader& loader);
     static TableFunction GetFunction();
 };
 
@@ -150,14 +150,8 @@ struct FastTwoHop {
     static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
                                          vector<LogicalType>& return_types, vector<string>& names);
     static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output);
-    static TableFunction GetFunction() {
-        TableFunction func("fast_two_hop", {LogicalType::VARCHAR}, Execute, TwoHop::Bind);
-        func.init_global = FastTwoHopGTFS::Init;
-        func.named_parameters["vid"] = LogicalType::INTEGER;
-
-        return func;
-    }
-    static void Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
+    static TableFunction GetFunction();
+    static void Register(ExtensionLoader& loader);
 };
 
 }  // namespace duckdb

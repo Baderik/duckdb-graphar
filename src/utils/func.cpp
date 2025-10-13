@@ -47,6 +47,30 @@ unique_ptr<ArrowTypeInfo> GraphArFunctions::graphArT2ArrowTypeInfo(const std::st
     }
 }
 
+Value GraphArFunctions::ArrowScalar2DuckValue(const std::shared_ptr<arrow::Scalar>& scalar) {
+    if (!scalar->is_valid) {
+        return Value();
+    }
+
+    switch (scalar->type->id()) {
+        case arrow::Type::BOOL:
+            return Value::BOOLEAN(static_cast<const arrow::BooleanScalar&>(*scalar).value);
+        case arrow::Type::INT32:
+            return Value::INTEGER(static_cast<const arrow::Int32Scalar&>(*scalar).value);
+        case arrow::Type::INT64:
+            return Value::BIGINT(static_cast<const arrow::Int64Scalar&>(*scalar).value);
+        case arrow::Type::FLOAT:
+            return Value::FLOAT(static_cast<const arrow::FloatScalar&>(*scalar).value);
+        case arrow::Type::DOUBLE:
+            return Value::DOUBLE(static_cast<const arrow::DoubleScalar&>(*scalar).value);
+        case arrow::Type::STRING:
+        case arrow::Type::LARGE_STRING:
+            return Value(static_cast<const arrow::StringScalar&>(*scalar).value->ToString());
+        default:
+            throw duckdb::NotImplementedException("Arrow scalar type not supported: " + scalar->type->ToString());
+    }
+}
+
 template <typename Info>
 std::string GraphArFunctions::GetNameFromInfo(const std::shared_ptr<Info>& info) {
     throw InternalException("Unsupported info");
@@ -54,12 +78,12 @@ std::string GraphArFunctions::GetNameFromInfo(const std::shared_ptr<Info>& info)
 
 template <>
 std::string GraphArFunctions::GetNameFromInfo(const std::shared_ptr<graphar::VertexInfo>& info) {
-    return info->GetType() + ".vertex";
+    return info->GetType() + "_vertex";
 }
 
 template <>
 std::string GraphArFunctions::GetNameFromInfo(const std::shared_ptr<graphar::EdgeInfo>& info) {
-    return info->GetSrcType() + "_" + info->GetEdgeType() + "_" + info->GetDstType() + ".edge";
+    return info->GetSrcType() + "_" + info->GetEdgeType() + "_" + info->GetDstType() + "_edge";
 }
 
 int64_t GraphArFunctions::GetVertexNum(std::shared_ptr<graphar::GraphInfo> graph_info, std::string& type) {

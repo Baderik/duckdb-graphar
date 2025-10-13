@@ -8,7 +8,6 @@
 #include <duckdb/common/vector_size.hpp>
 #include <duckdb/function/table_function.hpp>
 #include <duckdb/function/table/arrow.hpp>
-#include <duckdb/main/extension_util.hpp>
 
 #include <graphar/api/high_level_reader.h>
 
@@ -18,24 +17,9 @@ namespace duckdb {
 //-------------------------------------------------------------------
 // Bind
 //-------------------------------------------------------------------
-unique_ptr<FunctionData> TestF::Bind(ClientContext& context, TableFunctionBindInput& input,
-                                     vector<LogicalType>& return_types, vector<string>& names) {
-    const auto file_path = StringValue::Get(input.inputs[0]);
-    const auto file_path_2 = StringValue::Get(input.inputs[1]);
-
-    auto bind_data = std::make_unique<TestBindData>(file_path, file_path_2);
-
-    return_types.push_back(LogicalType::BIGINT);
-    names.push_back(SRC_GID_COLUMN);
-    return_types.push_back(LogicalType::BIGINT);
-    names.push_back(DST_GID_COLUMN);
-
-    return std::move(bind_data);
-}
-
-unique_ptr<FunctionData> TwoHopParquet::Bind(ClientContext& context, TableFunctionBindInput& input,
+unique_ptr<FunctionData> TwoHopThreads::Bind(ClientContext& context, TableFunctionBindInput& input,
                                              vector<LogicalType>& return_types, vector<string>& names) {
-    DUCKDB_GRAPHAR_LOG_TRACE("TwoHopParquet::Bind");
+    DUCKDB_GRAPHAR_LOG_TRACE("TwoHopThreads::Bind");
 
     const auto edge_info_path = StringValue::Get(input.inputs[0]);
     const int64_t vid = IntegerValue::Get(input.named_parameters.at("vid"));
@@ -45,30 +29,15 @@ unique_ptr<FunctionData> TwoHopParquet::Bind(ClientContext& context, TableFuncti
     return_types.push_back(LogicalType::BIGINT);
     names.push_back(DST_GID_COLUMN);
 
-    return std::move(std::make_unique<TwoHopParquetBindData>(edge_info_path, vid));
+    return std::move(std::make_unique<TwoHopThreadsBindData>(edge_info_path, vid));
 }
 //-------------------------------------------------------------------
 // State Init
 //-------------------------------------------------------------------
-unique_ptr<GlobalTableFunctionState> TestGlobalTableFunctionState::Init(ClientContext& context, TableFunctionInitInput& input) {
-    DUCKDB_GRAPHAR_LOG_TRACE("Test::GlobalStateInit");
-    auto bind_data = input.bind_data->Cast<TestBindData>();
-
-    return std::make_unique<TestGlobalTableFunctionState>(context, bind_data);
-}
-
-unique_ptr<LocalTableFunctionState> TestLocalTableFunctionState::Init(ExecutionContext &context,
-                                                                      TableFunctionInitInput &input,
-                                                                      GlobalTableFunctionState *global_state) {
-    DUCKDB_GRAPHAR_LOG_TRACE("Test::LocalStateInit");
-    auto local_state = std::make_unique<TestLocalTableFunctionState>();
-    return std::move(local_state);
-}
-
-unique_ptr<GlobalTableFunctionState> TwoHopParquetGlobalTableFunctionState::Init(ClientContext& context, TableFunctionInitInput& input) {
-    DUCKDB_GRAPHAR_LOG_TRACE("TwoHopParquet::GlobalInit");
-    auto bind_data = input.bind_data->Cast<TwoHopParquetBindData>();
-    std::unique_ptr<TwoHopParquetGlobalTableFunctionState> global_state = std::make_unique<TwoHopParquetGlobalTableFunctionState>(context, bind_data);
+unique_ptr<GlobalTableFunctionState> TwoHopThreadsGlobalTableFunctionState::Init(ClientContext& context, TableFunctionInitInput& input) {
+    DUCKDB_GRAPHAR_LOG_TRACE("TwoHopThreads::GlobalInit");
+    auto bind_data = input.bind_data->Cast<TwoHopThreadsBindData>();
+    std::unique_ptr<TwoHopThreadsGlobalTableFunctionState> global_state = std::make_unique<TwoHopThreadsGlobalTableFunctionState>(context, bind_data);
     auto &state = global_state->GetState();
     std::string yaml_content = GetYamlContent(bind_data.edge_info_path);
     auto edge_info = graphar::EdgeInfo::Load(yaml_content).value();
@@ -101,32 +70,19 @@ unique_ptr<GlobalTableFunctionState> TwoHopParquetGlobalTableFunctionState::Init
     return std::move(global_state);
 }
 
-unique_ptr<LocalTableFunctionState> TwoHopParquetLocalTableFunctionState::Init(ExecutionContext &context,
+unique_ptr<LocalTableFunctionState> TwoHopThreadsLocalTableFunctionState::Init(ExecutionContext &context,
                                                                                TableFunctionInitInput &input,
                                                                                GlobalTableFunctionState *global_state) {
-    DUCKDB_GRAPHAR_LOG_TRACE("TwoHopParquet::LocalStateInit");
-    std::unique_ptr<TwoHopParquetLocalTableFunctionState> local_state = std::make_unique<TwoHopParquetLocalTableFunctionState>();
+    DUCKDB_GRAPHAR_LOG_TRACE("TwoHopThreads::LocalStateInit");
+    std::unique_ptr<TwoHopThreadsLocalTableFunctionState> local_state = std::make_unique<TwoHopThreadsLocalTableFunctionState>();
     return std::move(local_state);
 }
 //-------------------------------------------------------------------
 // Execute
 //-------------------------------------------------------------------
-void TestF::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
-    TestLocalTableFunctionState& local_state = input.local_state->Cast<TestLocalTableFunctionState>();
-    if (local_state.first) {
-        output.SetCapacity(1);
-        output.SetCardinality(1);
-        local_state.first = false;
-        //        DUCKDB_GRAPHAR_LOG_INFO("Test::Execute");
-        output.SetValue(0, 0, 1);
-        output.SetValue(1, 0, 1);
-        return;
-    }
-}
-
-void TwoHopParquet::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
-    DUCKDB_GRAPHAR_LOG_TRACE("TwoHopParquet::Execute")
-    TwoHopParquetGlobalState& gstate = input.global_state->Cast<TwoHopParquetGlobalTableFunctionState>().GetState();
+void TwoHopThreads::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
+    DUCKDB_GRAPHAR_LOG_TRACE("TwoHopThreads::Execute")
+    TwoHopThreadsGlobalState& gstate = input.global_state->Cast<TwoHopThreadsGlobalTableFunctionState>().GetState();
 
     std::unique_ptr<LowEdgeReaderByVertex> reader;
     while (!gstate.vertex_readers.empty()) {
@@ -157,22 +113,13 @@ void TwoHopParquet::Execute(ClientContext& context, TableFunctionInput& input, D
 //-------------------------------------------------------------------
 // Function
 //-------------------------------------------------------------------
-TableFunction TestF::GetFunction() {
-    TableFunction test_f("test_f", {LogicalType::VARCHAR, LogicalType::VARCHAR}, Execute, Bind,
-                         TestGlobalTableFunctionState::Init, TestLocalTableFunctionState::Init);
-
-    return test_f;
-}
-
-TableFunction TwoHopParquet::GetFunction() {
-    TableFunction read_edges("two_hop_parquet", {LogicalType::VARCHAR}, Execute, Bind,
-                             TwoHopParquetGlobalTableFunctionState::Init, TwoHopParquetLocalTableFunctionState::Init);
+TableFunction TwoHopThreads::GetFunction() {
+    TableFunction read_edges("two_hop_threads", {LogicalType::VARCHAR}, Execute, Bind,
+                             TwoHopThreadsGlobalTableFunctionState::Init, TwoHopThreadsLocalTableFunctionState::Init);
     read_edges.named_parameters["vid"] = LogicalType::INTEGER;
 
     return read_edges;
 }
 
-void TestF::Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
-
-void TwoHopParquet::Register(DatabaseInstance& db) { ExtensionUtil::RegisterFunction(db, GetFunction()); }
+void TwoHopThreads::Register(ExtensionLoader& loader) { loader.RegisterFunction(GetFunction()); }
 }
