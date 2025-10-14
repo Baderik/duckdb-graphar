@@ -7,6 +7,16 @@ set(EXTENSION_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "Extension root 
 
 project(${TARGET_NAME})
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/extension_deps.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/extension_deps.cmake")
+endif()
+
+message("My roots: ${ARROW_ROOT} ${GRAPHAR_ROOT}")
 if(ARROW_ROOT)
     list(APPEND CMAKE_PREFIX_PATH ${ARROW_ROOT})
 endif()
@@ -16,24 +26,22 @@ if(GRAPHAR_ROOT)
 endif()
 
 find_package(CURL REQUIRED)
-find_package(Arrow REQUIRED)
+find_package(Arrow REQUIRED CONFIG)
 
-find_package(ArrowDataset REQUIRED)
-find_package(ArrowAcero REQUIRED)
-find_package(Parquet REQUIRED)
-find_package(graphar REQUIRED)
+find_package(ArrowDataset REQUIRED CONFIG)
+find_package(ArrowAcero REQUIRED CONFIG)
+find_package(Parquet REQUIRED CONFIG)
+find_package(graphar REQUIRED CONFIG)
 
 include_directories(include)
 
 file(GLOB_RECURSE EXTENSION_SOURCES CONFIGURE_DEPENDS "${EXTENSION_ROOT_DIR}/src/*.cpp")
 
-log_stage("Building static extension")
+message(LOG "Building static extension")
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
-log_done()
 
-log_stage("Building loadable extension")
+message(LOG "Building loadable extension")
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
-log_done()
 
 set(EXTENSION_LIBRARIES
         graphar
