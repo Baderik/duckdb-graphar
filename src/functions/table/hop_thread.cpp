@@ -6,8 +6,8 @@
 
 #include <duckdb/common/named_parameter_map.hpp>
 #include <duckdb/common/vector_size.hpp>
-#include <duckdb/function/table_function.hpp>
 #include <duckdb/function/table/arrow.hpp>
+#include <duckdb/function/table_function.hpp>
 
 #include <graphar/api/high_level_reader.h>
 
@@ -34,47 +34,47 @@ unique_ptr<FunctionData> TwoHopThreads::Bind(ClientContext& context, TableFuncti
 //-------------------------------------------------------------------
 // State Init
 //-------------------------------------------------------------------
-unique_ptr<GlobalTableFunctionState> TwoHopThreadsGlobalTableFunctionState::Init(ClientContext& context, TableFunctionInitInput& input) {
+unique_ptr<GlobalTableFunctionState> TwoHopThreadsGlobalTableFunctionState::Init(ClientContext& context,
+                                                                                 TableFunctionInitInput& input) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHopThreads::GlobalInit");
     auto bind_data = input.bind_data->Cast<TwoHopThreadsBindData>();
-    std::unique_ptr<TwoHopThreadsGlobalTableFunctionState> global_state = std::make_unique<TwoHopThreadsGlobalTableFunctionState>(context, bind_data);
-    auto &state = global_state->GetState();
+    std::unique_ptr<TwoHopThreadsGlobalTableFunctionState> global_state =
+        std::make_unique<TwoHopThreadsGlobalTableFunctionState>(context, bind_data);
+    auto& state = global_state->GetState();
     std::string yaml_content = GetYamlContent(bind_data.edge_info_path);
     auto edge_info = graphar::EdgeInfo::Load(yaml_content).value();
     if (!edge_info) {
         throw BinderException("No found edge this type");
     }
     const std::string prefix = GetDirectory(bind_data.edge_info_path);
-    std::shared_ptr<OffsetReader> offset_reader = std::make_shared<OffsetReader>(edge_info, prefix, graphar::AdjListType::ordered_by_source);
-    LowEdgeReaderByVertex one_hop_reader = LowEdgeReaderByVertex(edge_info,
-                                                                 prefix,
-                                                                 graphar::AdjListType::ordered_by_source,
-                                                                 offset_reader);
+    std::shared_ptr<OffsetReader> offset_reader =
+        std::make_shared<OffsetReader>(edge_info, prefix, graphar::AdjListType::ordered_by_source);
+    LowEdgeReaderByVertex one_hop_reader =
+        LowEdgeReaderByVertex(edge_info, prefix, graphar::AdjListType::ordered_by_source, offset_reader);
     one_hop_reader.SetVertex(bind_data.vid);
 
     std::unique_ptr<Connection> conn = std::make_unique<Connection>(*context.db);
     one_hop_reader.start(std::move(conn));
 
-    for (std::unique_ptr<DataChunk> data = std::move(one_hop_reader.read()); data != nullptr; data = std::move(one_hop_reader.read())) {
+    for (std::unique_ptr<DataChunk> data = std::move(one_hop_reader.read()); data != nullptr;
+         data = std::move(one_hop_reader.read())) {
         for (int i = 0; i < data->size(); ++i) {
-            std::unique_ptr<LowEdgeReaderByVertex> reader = std::make_unique<LowEdgeReaderByVertex>(edge_info,
-                                                                                                    prefix,
-                                                                                                    graphar::AdjListType::ordered_by_source,
-                                                                                                    offset_reader);
+            std::unique_ptr<LowEdgeReaderByVertex> reader = std::make_unique<LowEdgeReaderByVertex>(
+                edge_info, prefix, graphar::AdjListType::ordered_by_source, offset_reader);
             reader->SetVertex(data->GetValue(1, i).GetValue<int64_t>());
             state.vertex_readers.push(std::move(reader));
-
         }
     }
 
     return std::move(global_state);
 }
 
-unique_ptr<LocalTableFunctionState> TwoHopThreadsLocalTableFunctionState::Init(ExecutionContext &context,
-                                                                               TableFunctionInitInput &input,
-                                                                               GlobalTableFunctionState *global_state) {
+unique_ptr<LocalTableFunctionState> TwoHopThreadsLocalTableFunctionState::Init(ExecutionContext& context,
+                                                                               TableFunctionInitInput& input,
+                                                                               GlobalTableFunctionState* global_state) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHopThreads::LocalStateInit");
-    std::unique_ptr<TwoHopThreadsLocalTableFunctionState> local_state = std::make_unique<TwoHopThreadsLocalTableFunctionState>();
+    std::unique_ptr<TwoHopThreadsLocalTableFunctionState> local_state =
+        std::make_unique<TwoHopThreadsLocalTableFunctionState>();
     return std::move(local_state);
 }
 //-------------------------------------------------------------------
@@ -122,4 +122,4 @@ TableFunction TwoHopThreads::GetFunction() {
 }
 
 void TwoHopThreads::Register(ExtensionLoader& loader) { loader.RegisterFunction(GetFunction()); }
-}
+}  // namespace duckdb

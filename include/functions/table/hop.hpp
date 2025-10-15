@@ -101,13 +101,9 @@ public:
 
 struct FastTwoHopGS {
 public:
-    FastTwoHopGS(ClientContext& context, const TwoHopBindData& bind_data) {
-        hop_i = hop_ids.begin();
-    };
+    FastTwoHopGS(ClientContext& context, const TwoHopBindData& bind_data) { hop_i = hop_ids.begin(); };
 
-    void init_iter() {
-        hop_i = hop_ids.begin();
-    }
+    void init_iter() { hop_i = hop_ids.begin(); }
 
 public:
     std::set<std::int64_t> hop_ids;
@@ -124,6 +120,7 @@ public:
     static unique_ptr<GlobalTableFunctionState> Init(ClientContext& context, TableFunctionInitInput& input);
 
     FastTwoHopGS& GetState() { return state; }
+
 public:
     FastTwoHopGS state;
 };

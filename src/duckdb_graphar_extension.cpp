@@ -5,9 +5,9 @@
 #include "functions/scalar/bfs.hpp"
 #include "functions/table/edges_vertex.hpp"
 #include "functions/table/hop.hpp"
+#include "functions/table/hop_thread.hpp"
 #include "functions/table/read_edges.hpp"
 #include "functions/table/read_vertices.hpp"
-#include "functions/table/hop_thread.hpp"
 #include "storage/graphar_storage.hpp"
 #include "utils/global_log_manager.hpp"
 

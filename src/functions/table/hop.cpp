@@ -78,20 +78,16 @@ unique_ptr<GlobalTableFunctionState> OneMoreHopGlobalTableFunctionState::Init(Cl
 
     return make_uniq<OneMoreHopGlobalTableFunctionState>(context, bind_data);
 }
-unique_ptr<GlobalTableFunctionState> FastTwoHopGTFS::Init(ClientContext& context,
-                                                          TableFunctionInitInput& input) {
+unique_ptr<GlobalTableFunctionState> FastTwoHopGTFS::Init(ClientContext& context, TableFunctionInitInput& input) {
     DUCKDB_GRAPHAR_LOG_DEBUG("FastTwoHop::GlobalTableFunctionState::Init");
     auto bind_data = input.bind_data->Cast<FastTwoHopBD>();
 
     std::unique_ptr<FastTwoHopGTFS> gtfs = make_uniq<FastTwoHopGTFS>(context, bind_data);
     FastTwoHopGS& state = gtfs->GetState();
-    state.offset_reader = std::make_shared<OffsetReader>(bind_data.GetEdgeInfo(),
-                                                         bind_data.GetPrefix(),
+    state.offset_reader = std::make_shared<OffsetReader>(bind_data.GetEdgeInfo(), bind_data.GetPrefix(),
                                                          graphar::AdjListType::ordered_by_source);
-    state.reader = std::make_unique<LowEdgeReaderByVertex>(bind_data.GetEdgeInfo(),
-                                                           bind_data.GetPrefix(),
-                                                           graphar::AdjListType::ordered_by_source,
-                                                           state.offset_reader);
+    state.reader = std::make_unique<LowEdgeReaderByVertex>(
+        bind_data.GetEdgeInfo(), bind_data.GetPrefix(), graphar::AdjListType::ordered_by_source, state.offset_reader);
     DUCKDB_GRAPHAR_LOG_DEBUG("Reader started before " + to_string(state.reader->started()));
     state.reader->SetVertex(bind_data.GetVid());
     DUCKDB_GRAPHAR_LOG_DEBUG("Reader started after " + to_string(state.reader->started()));
@@ -277,7 +273,7 @@ void FastTwoHop::Execute(ClientContext& context, TableFunctionInput& input, Data
                 global_state.hop_ids.emplace(data->GetValue(1, i).GetValue<int64_t>());
             }
             output.Reference(*data);
-            return ;
+            return;
         }
         DUCKDB_GRAPHAR_LOG_DEBUG("OneHop finished")
         global_state.init_iter();
