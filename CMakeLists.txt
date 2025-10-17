@@ -31,12 +31,11 @@ if(GRAPHAR_ROOT)
     list(APPEND CMAKE_PREFIX_PATH ${GRAPHAR_ROOT})
 endif()
 
-find_package(CURL REQUIRED)
 find_package(Arrow REQUIRED CONFIG)
-
 find_package(ArrowDataset REQUIRED CONFIG)
 find_package(ArrowAcero REQUIRED CONFIG)
 find_package(Parquet REQUIRED CONFIG)
+
 find_package(graphar REQUIRED CONFIG)
 
 include_directories(include)
