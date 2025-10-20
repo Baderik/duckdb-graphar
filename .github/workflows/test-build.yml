@@ -101,7 +101,20 @@ jobs:
 
       - name: Build
         run: |
-          make release
+          set -e
+          for i in {1..2}; do
+            if make release; then
+              echo "Build succeeded on attempt $i"
+              break
+            else
+              echo "Build failed on attempt $i"
+              if [ $i -eq 2 ]; then
+                echo "Build failed after 2 attempts. Exiting."
+                exit 1
+              fi
+              echo "Retrying build..."
+            fi
+          done
 
       - name: Prepare Artifacts for Upload
         run: |
