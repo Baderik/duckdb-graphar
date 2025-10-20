@@ -1,0 +1,117 @@
+name: Temp Pipeline for loadable
+
+on:
+  push:
+    branches: [ main, by_template_static ]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pr-title-check:
+    name: PR Title Check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check PR Title
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+            const pattern = /(^[mM]erge\s.*$)|(^[rR]evert\s.*$)|(^BREAKING CHANGE:.*$)|(^MINOR\s.*$)|(^(\w+)(?:\(([\w\$\.\-\*\s]+)\))?\:\s(.+)$)/;
+            if (!pattern.test(title)) {
+              core.setFailed(`PR title "${title}" doesn't match required format. Please use one of:
+              - Conventional commit format: "type(scope): description"
+              - Merge format: "Merge ..."
+              - Revert format: "Revert ..."
+              - Breaking change: "BREAKING CHANGE: description"
+              - Minor change: "MINOR description"`);
+            }
+
+  lint:
+    name: C++ Style Check
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install clang-format-19
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19 all
+          sudo apt-get install -y clang-format-19
+
+      - name: Verify C++ Code Style
+        run: |
+          find src/ include/ -name '*.cpp' -o -name '*.hpp' | xargs clang-format-19 --dry-run -Werror
+
+  build:
+    name: ${{ matrix.os }} Build and Test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install System Dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake curl libcurl4-openssl-dev zlib1g-dev \
+            libzstd-dev libsnappy-dev ccache python3-pip
+
+      - name: Install System Dependencies (macOS)
+        if: matrix.os == 'macos-14'
+        run: brew install ccache
+
+      - name: Set up specific CMake version (macOS)
+        if: matrix.os == 'macos-14'
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.28.3'
+
+      - name: Set up ccache
+        run: |
+          echo "CCACHE_DIR=${{ matrix.ccache_dir }}" >> $GITHUB_ENV
+          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
+            echo "/usr/lib/ccache" >> $GITHUB_PATH
+          elif [ "${{ matrix.os }}" = "macos-14" ]; then
+            echo "/usr/local/opt/ccache/libexec" >> $GITHUB_PATH
+          fi
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ matrix.ccache_dir }}
+            build/_deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-deps
+
+      - name: Build
+        run: |
+          make release
+
+      - name: Prepare Artifacts for Upload
+        run: |
+          mkdir -p upload-artifacts
+
+          cp build/release/duckdb upload-artifacts/
+          cp build/release/extension/duckdb_graphar/duckdb_graphar.duckdb_extension upload-artifacts/
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: duckdb-graphar-${{ matrix.os }}
+          path: upload-artifacts
+          if-no-files-found: error
+
