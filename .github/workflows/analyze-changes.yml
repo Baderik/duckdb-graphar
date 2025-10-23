@@ -34,7 +34,7 @@ jobs:
       - name: Build
         run: |
           cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=On -B build .
-          cmake --build build -j$(nproc)
+          cmake --build build -j$(getconf _NPROCESSORS_ONLN)
 
       - name: Analyze and generate report
         run: |
@@ -44,7 +44,7 @@ jobs:
           fi
 
           pvs-studio-analyzer analyze -f build/compile_commands.json --exclude-path 'build/_deps/' \
-            --disableLicenseExpirationCheck -S source-files.txt -j $(nproc)
+            --disableLicenseExpirationCheck -S source-files.txt -j$(getconf _NPROCESSORS_ONLN)
           plog-converter -t sarif -o pvs-report.sarif PVS-Studio.log
 
       - name: Publish report

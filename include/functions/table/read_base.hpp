@@ -18,6 +18,7 @@
 #include <graphar/fwd.h>
 #include <graphar/reader_util.h>
 
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <variant>
@@ -32,6 +33,7 @@ static graphar::Status next_chunk(Reader& reader) {
 }
 
 static graphar::Result<std::shared_ptr<arrow::Table>> GetChunk(Reader& reader) {
+    DUCKDB_GRAPHAR_LOG_TRACE("GetChunk");
     return std::visit([](auto& r) { return r.GetChunk(); }, reader);
 }
 
@@ -47,7 +49,7 @@ static graphar::Status seek_chunk_index(Reader& reader, graphar::IdType vertex_c
         reader);
 }
 
-static graphar::Status seek_vid(Reader& reader, graphar::IdType vid, std::string& filter_column) {
+static graphar::Status seek_vid(Reader& reader, graphar::IdType vid, const std::string& filter_column) {
     return std::visit(
         [&](auto& r) {
             if (filter_column == GID_COLUMN_INTERNAL) {
@@ -91,6 +93,7 @@ public:
     vector<std::string> GetParams() { return params; }
     vector<std::string>& GetFlattenPropNames() { return flatten_prop_names; }
     vector<std::string>& GetFlattenPropTypes() { return flatten_prop_types; }
+    const std::shared_ptr<graphar::GraphInfo>& GetGraphInfo() const { return graph_info; }
 
 private:
     vector<vector<std::string>> prop_names;
@@ -102,6 +105,9 @@ private:
     vector<std::string> params;
     graphar::PropertyGroupVector pgs;
     idx_t columns_to_remove = 0;
+
+    std::pair<graphar::IdType, graphar::IdType> vid_range = {-1, -1};
+    std::string filter_column;
 
     template <typename ReadFinal>
     friend class ReadBase;
@@ -125,6 +131,7 @@ private:
     std::string function_name;
     int64_t total_rows = 0;
     vector<column_t> column_ids;
+    idx_t columns_to_remove = 0;
 
     template <typename ReadFinal>
     friend class ReadBase;
@@ -141,6 +148,10 @@ public:
                             unique_ptr<ReadBindData>& bind_data, string function_name, idx_t columns_to_remove = 0,
                             idx_t pg_for_id = 0, vector<string> id_columns = {}) {
         DUCKDB_GRAPHAR_LOG_TRACE("ReadBase::SetBindData");
+        if (std::filesystem::path(graph_info->GetPrefix()).is_relative()) {
+            throw IOException(
+                "Using relative path as prefix is not supported. Please use absolute path or just remove this field.");
+        }
         bind_data->pgs = type_info.GetPropertyGroups();
         DUCKDB_GRAPHAR_LOG_DEBUG("pgs size " + std::to_string(bind_data->pgs.size()));
         bind_data->prop_types.resize(bind_data->pgs.size() + pg_for_id);
@@ -197,6 +208,7 @@ public:
 
     static graphar::Result<std::shared_ptr<arrow::Table>> NextChunk(idx_t reader_i,
                                                                     ReadBaseGlobalTableFunctionState& gstate) {
+        DUCKDB_GRAPHAR_LOG_TRACE("ReadBase::NextChunk");
         auto& reader = gstate.readers[reader_i];
         int& first_chunk_flag = gstate.first_chunk_flags[reader_i];
         if (first_chunk_flag) {
@@ -232,14 +244,14 @@ public:
     }
 
     static std::shared_ptr<Reader> GetReader(ReadBaseGlobalTableFunctionState& gstate, ReadBindData& bind_data,
-                                             idx_t ind, const std::string& filter_value,
-                                             const std::string& filter_column, const std::string& filter_type) {
-        return ReadFinal::GetReader(gstate, bind_data, ind, filter_value, filter_column, filter_type);
+                                             idx_t ind, const std::string& filter_column) {
+        return ReadFinal::GetReader(gstate, bind_data, ind, filter_column);
     }
 
-    static void SetFilter(ReadBaseGlobalTableFunctionState& gstate, ReadBindData& bind_data, std::string& filter_value,
-                          std::string& filter_column, std::string& filter_type) {
-        ReadFinal::SetFilter(gstate, bind_data, filter_value, filter_column, filter_type);
+    static void SetFilter(ReadBaseGlobalTableFunctionState& gstate, ReadBindData& bind_data,
+                          const std::pair<graphar::IdType, graphar::IdType>& vid_range,
+                          const std::string& filter_column) {
+        ReadFinal::SetFilter(gstate, bind_data, vid_range, filter_column);
     }
 
     static unique_ptr<GlobalTableFunctionState> Init(ClientContext& context, TableFunctionInitInput& input) {
@@ -261,6 +273,7 @@ public:
         DUCKDB_GRAPHAR_LOG_DEBUG("Init global state");
 
         gstate.function_name = bind_data.function_name;
+        gstate.columns_to_remove = bind_data.columns_to_remove;
         gstate.pgs = bind_data.pgs;
         gstate.column_ids = input.column_ids;
         if (gstate.column_ids.empty() ||
@@ -275,42 +288,27 @@ public:
 
         DUCKDB_GRAPHAR_LOG_DEBUG("readers num: " + std::to_string(gstate.readers.size()));
 
-        std::string filter_value, filter_column, filter_type;
-        if (input.filters) {
-            DUCKDB_GRAPHAR_LOG_DEBUG("Found filters");
+        const auto& filter_column = bind_data.filter_column;
 
-            if (input.filters->filters.size() > 1) {
-                throw NotImplementedException("Multiple filters are not supported");
-            }
-            auto filter_id = input.filters->filters.begin()->first;
-            auto filter_index = input.column_ids[filter_id];
-            auto& filter = input.filters->filters.begin()->second;
-            if (filter->filter_type != TableFilterType::CONSTANT_COMPARISON) {
-                throw NotImplementedException("Only constant filters are supported");
-            }
-            auto filter_expr = filter->ToString(" ");
-            if (filter_expr[1] != '=') {
-                throw NotImplementedException("Only equality filters are supported");
-            }
-
-            filter_value = filter_expr.substr(2);
-
-            filter_column = bind_data.flatten_prop_names[filter_index];
-            filter_type = bind_data.flatten_prop_types[filter_index];
-            DUCKDB_GRAPHAR_LOG_DEBUG("filter column: " + filter_column + " filter type: " + filter_type +
-                                     " filter value: " + filter_value);
-        }
-        if (time_logging) {
-            t.print("filter parsing");
-        }
-
-        for (idx_t i = 0; i < gstate.readers.size(); i++) {
-            gstate.readers[i] = GetReader(gstate, bind_data, i, filter_value, filter_column, filter_type);
-        }
+        idx_t reader_i = 0;
+        std::generate(gstate.readers.begin(), gstate.readers.end(),
+                      [&]() { return GetReader(gstate, bind_data, reader_i++, filter_column); });
         if (time_logging) {
             t.print("readers creation");
         }
-        SetFilter(gstate, bind_data, filter_value, filter_column, filter_type);
+        if (filter_column != "") {
+            auto vid_range = bind_data.vid_range;
+            const auto vertex_num = (filter_column == DST_GID_COLUMN)
+                                        ? GraphArFunctions::GetVertexNum(bind_data.graph_info, bind_data.params[2])
+                                        : GraphArFunctions::GetVertexNum(bind_data.graph_info, bind_data.params[0]);
+            graphar::IdType zero = 0;
+            vid_range.first = std::max(zero, vid_range.first);
+            vid_range.second = std::min(vertex_num - 1, vid_range.second);
+            if (vid_range.first > vid_range.second) {
+                throw IOException("Invalid filter range");
+            }
+            SetFilter(gstate, bind_data, vid_range, filter_column);
+        }
         if (time_logging) {
             t.print("filter setting");
         }
@@ -319,6 +317,7 @@ public:
         gstate.prop_types = bind_data.prop_types;
 
         for (idx_t i = 0; i < gstate.readers.size(); i++) {
+            DUCKDB_GRAPHAR_LOG_TRACE("Get chunk for reader " + std::to_string(i));
             auto result = NextChunk(i, gstate);
             if (time_logging) {
                 t.print("get_chunk");
@@ -462,6 +461,11 @@ public:
                     throw std::runtime_error("Error while getting chunk: " + result.status().message());
                 }
                 gstate.tables[i] = result.value();
+                if (i) {
+                    for (idx_t j = 0; j < gstate.columns_to_remove; j++) {
+                        gstate.tables[i] = gstate.tables[i]->RemoveColumn(0).ValueOrDie();
+                    }
+                }
                 gstate.sizes[i] = gstate.tables[i]->num_rows();
                 gstate.indices[i] = 0;
             }

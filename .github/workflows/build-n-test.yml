@@ -50,7 +50,7 @@ jobs:
   build:
     name: ${{ matrix.os }} Build and Test
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -106,59 +106,14 @@ jobs:
       - name: Build
         run: |
           cd build
-          make -j$(nproc)
+          make -j$(getconf _NPROCESSORS_ONLN)
 
       - name: Install GraphAr CLI and Generate Data
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          set -euxo pipefail
-
           pip3 install --upgrade pip
-
-          ROOT_DIR=$(pwd)
-          DEPS_DIR=$ROOT_DIR/build/_deps
-          ARROW_INSTALL_DIR=$DEPS_DIR/arrow-install
-          ARROW_BUILD_DIR=$DEPS_DIR/arrow-prefix/src/arrow-build
-          PROTOBUF_INSTALL_DIR=$ARROW_BUILD_DIR/protobuf_ep-install
-          GRAPHAR_CLI_DIR=$DEPS_DIR/graphar-prefix/src/graphar/cli
-
-          CMAKE_ARGS=(
-            --config-settings=cmake.define.Arrow_DIR="$ARROW_INSTALL_DIR/lib/cmake/Arrow"
-            --config-settings=cmake.define.Parquet_DIR="$ARROW_INSTALL_DIR/lib/cmake/Parquet"
-            --config-settings=cmake.define.ArrowDataset_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowDataset"
-            --config-settings=cmake.define.ArrowAcero_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowAcero"
-            --config-settings=cmake.define.Protobuf_INCLUDE_DIR="$PROTOBUF_INSTALL_DIR/include"
-            --config-settings=cmake.define.Protobuf_LIBRARIES="$PROTOBUF_INSTALL_DIR/lib/libprotobuf.a"
-            --config-settings=cmake.define.CMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
-          )
-          pip3 install "$GRAPHAR_CLI_DIR" "${CMAKE_ARGS[@]}"
-
-          GRAPH_DIR=$ROOT_DIR/data/snap-musae-github
-          GRAPH_IMPORT_TEMPLATE=$GRAPH_DIR/import.script.git.yaml
-          GRAPH_IMPORT=$GRAPH_DIR/import.git.yaml
-          GRAPH_RESULT_DIR=$GRAPH_DIR/graphar
-
-          mkdir -p "$GRAPH_RESULT_DIR"
-          cp "$GRAPH_IMPORT_TEMPLATE" "$GRAPH_IMPORT"
-          sed -i "s|\$DIR_PATH|$GRAPH_DIR|g" "$GRAPH_IMPORT"
-
-          graphar import -c "$GRAPH_IMPORT"
-          rm "$GRAPH_IMPORT"
-
-          GRAPH_NAME=$(grep "name:" "$GRAPH_IMPORT_TEMPLATE" | head -n1 | sed 's/^[^:]*:[[:space:]]*//')
-          GRAPH_INFO_FILE=$GRAPH_RESULT_DIR/$GRAPH_NAME.graph.yaml
-
-          readarray -t edges < <(find "$GRAPH_RESULT_DIR" -maxdepth 1 -type f -name "*edge*" -exec basename {} \;)
-          readarray -t vertices < <(find "$GRAPH_RESULT_DIR" -maxdepth 1 -type f -name "*vertex*" -exec basename {} \;)
-
-          {
-            echo "edges:"
-            for edge in "${edges[@]}"; do echo "  - $edge"; done
-            echo "name: $GRAPH_NAME"
-            echo "vertices:"
-            for vertex in "${vertices[@]}"; do echo "  - $vertex"; done
-            echo "version: gar/v1"
-          } > "$GRAPH_INFO_FILE"
+          ./scripts/install-cli.sh || exit 1
+          ./scripts/generate-graphar-data.sh || exit 1
 
       - name: Run Tests
         if: matrix.os == 'ubuntu-22.04'
