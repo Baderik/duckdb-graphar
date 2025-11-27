@@ -22,6 +22,7 @@ public:
     const std::shared_ptr<graphar::EdgeInfo>& GetEdgeInfo() const { return edge_info; }
     const std::string& GetPrefix() const { return prefix; }
     graphar::IdType GetSrcId() const { return src_id; }
+    graphar::IdType GetVid() const { return GetSrcId(); }
 
 private:
     std::shared_ptr<graphar::EdgeInfo> edge_info;
@@ -29,34 +30,21 @@ private:
     graphar::IdType src_id;
 };
 
-class FastTwoHopBD final : public TwoHopBindData {
-public:
-    graphar::IdType GetVid() const { return GetSrcId(); }
-};
 //-------------------------------------------------------------------
 // GlobalState
 //-------------------------------------------------------------------
 struct TwoHopGlobalState {
 public:
-    TwoHopGlobalState(ClientContext& context, const TwoHopBindData& bind_data)
-        : src_reader(MyAdjReaderOrdSrc(bind_data.GetEdgeInfo(), bind_data.GetPrefix())) {
-        src_reader.find_src(bind_data.GetSrcId());
-        hop_ids.reserve(src_reader.size());
-    };
+    TwoHopGlobalState(ClientContext& context, const TwoHopBindData& bind_data) { hop_i = hop_ids.begin(); };
 
-    const std::vector<std::int64_t>& GetHopIds() const { return hop_ids; }
-    bool IsOneHop() const { return one_hop; }
-    void SetOneHop(bool one_hop_) { one_hop = one_hop_; }
-    MyAdjReaderOrdSrc& GetSrcReader() { return src_reader; }
-    size_t GetHopI() const { return hop_i; }
-    size_t IncrementHopI() { return hop_i++; }
-    void AddHopId(std::int64_t id) { hop_ids.push_back(id); }
+    void init_iter() { hop_i = hop_ids.begin(); }
 
-private:
-    std::vector<std::int64_t> hop_ids;
+public:
+    std::set<std::int64_t> hop_ids;
     bool one_hop = true;
-    MyAdjReaderOrdSrc src_reader;
-    size_t hop_i = 0;
+    std::unique_ptr<LowEdgeReaderByVertex> reader;
+    std::shared_ptr<OffsetReader> offset_reader;
+    std::set<std::int64_t>::const_iterator hop_i;
 };
 
 struct TwoHopGlobalTableFunctionState : public GlobalTableFunctionState {
@@ -99,31 +87,6 @@ public:
     OneMoreHopGlobalState state;
 };
 
-struct FastTwoHopGS {
-public:
-    FastTwoHopGS(ClientContext& context, const TwoHopBindData& bind_data) { hop_i = hop_ids.begin(); };
-
-    void init_iter() { hop_i = hop_ids.begin(); }
-
-public:
-    std::set<std::int64_t> hop_ids;
-    bool one_hop = true;
-    std::unique_ptr<LowEdgeReaderByVertex> reader;
-    std::shared_ptr<OffsetReader> offset_reader;
-    std::set<std::int64_t>::const_iterator hop_i;
-};
-
-struct FastTwoHopGTFS : public GlobalTableFunctionState {
-public:
-    FastTwoHopGTFS(ClientContext& context, const TwoHopBindData& bind_data) : state(context, bind_data) {};
-
-    static unique_ptr<GlobalTableFunctionState> Init(ClientContext& context, TableFunctionInitInput& input);
-
-    FastTwoHopGS& GetState() { return state; }
-
-public:
-    FastTwoHopGS state;
-};
 //-------------------------------------------------------------------
 // Function
 //-------------------------------------------------------------------
@@ -142,13 +105,4 @@ struct OneMoreHop {
     static void Register(ExtensionLoader& loader);
     static TableFunction GetFunction();
 };
-
-struct FastTwoHop {
-    static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
-                                         vector<LogicalType>& return_types, vector<string>& names);
-    static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output);
-    static TableFunction GetFunction();
-    static void Register(ExtensionLoader& loader);
-};
-
 }  // namespace duckdb

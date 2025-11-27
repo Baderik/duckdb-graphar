@@ -46,7 +46,6 @@ static void LoadInternal(ExtensionLoader& loader) {
     TwoHop::Register(loader);
     OneMoreHop::Register(loader);
     TwoHopThreads::Register(loader);
-    FastTwoHop::Register(loader);
 
     config.storage_extensions["duckdb_graphar"] = make_uniq<GraphArStorageExtension>();
 }
