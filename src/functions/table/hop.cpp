@@ -67,7 +67,8 @@ unique_ptr<GlobalTableFunctionState> TwoHopGlobalTableFunctionState::Init(Client
     DUCKDB_GRAPHAR_LOG_DEBUG("TwoHop::GlobalTableFunctionState::Init");
     auto bind_data = input.bind_data->Cast<TwoHopBindData>();
 
-    std::unique_ptr<TwoHopGlobalTableFunctionState> gtfs = make_uniq<TwoHopGlobalTableFunctionState>(context, bind_data);
+    std::unique_ptr<TwoHopGlobalTableFunctionState> gtfs =
+        make_uniq<TwoHopGlobalTableFunctionState>(context, bind_data);
     TwoHopGlobalState& state = gtfs->GetState();
     state.offset_reader = std::make_shared<OffsetReader>(bind_data.GetEdgeInfo(), bind_data.GetPrefix(),
                                                          graphar::AdjListType::ordered_by_source);
