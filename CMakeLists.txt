@@ -59,7 +59,7 @@ ExternalProject_Add(
   arrow
   PREFIX ${ARROW_PREFIX_DIR}
   GIT_REPOSITORY https://github.com/apache/arrow.git
-  GIT_TAG apache-arrow-17.0.0
+  GIT_TAG apache-arrow-19.0.1
   SOURCE_SUBDIR cpp
   CMAKE_ARGS
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON
@@ -179,7 +179,7 @@ set(DISABLE_VPTR_SANITIZER ON CACHE BOOL "")
 FetchContent_Declare(
     duckdb
     GIT_REPOSITORY https://github.com/duckdb/duckdb.git
-    GIT_TAG v1.4.0
+    GIT_TAG v1.4.2
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
 )

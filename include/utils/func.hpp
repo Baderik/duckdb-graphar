@@ -40,7 +40,7 @@ struct GraphArFunctions {
     template <typename Info>
     static std::string GetNameFromInfo(const std::shared_ptr<Info>& info);
 
-    static int64_t GetVertexNum(std::shared_ptr<graphar::GraphInfo> graph_info, std::string& type);
+    static int64_t GetVertexNum(std::shared_ptr<graphar::GraphInfo> graph_info, const std::string& type);
 
     template <typename GraphArIter>
     static void setByIter(DataChunk& output, GraphArIter& iter, const int prop_i, const int row_i,
@@ -378,4 +378,7 @@ std::string GetYamlContent(const std::string& path);
 std::string GetDirectory(const std::string& path);
 std::int64_t GetCount(const std::string& path);
 std::int64_t GetVertexCount(const std::shared_ptr<graphar::EdgeInfo>& edge_info, const std::string& directory);
+
+void ConvertArrowTableToDataChunk(const arrow::Table& table, DataChunk& output, const std::vector<column_t>& column_ids,
+                                  ClientContext& context);
 }  // namespace duckdb

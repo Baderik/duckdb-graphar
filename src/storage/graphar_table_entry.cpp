@@ -3,6 +3,7 @@
 #include "functions/table/read_edges.hpp"
 #include "functions/table/read_vertices.hpp"
 #include "storage/graphar_table_information.hpp"
+#include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
 
 #include <duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp>
@@ -23,7 +24,30 @@ GraphArTableEntry::GraphArTableEntry(Catalog& catalog, unique_ptr<SchemaCatalogE
     : TableCatalogEntry(catalog, *schema, info), schema(std::move(schema)) {}
 
 unique_ptr<BaseStatistics> GraphArTableEntry::GetStatistics(ClientContext& context, column_t column_id) {
-    return nullptr;
+    // DUCKDB_GRAPHAR_LOG_TRACE("GraphArTableEntry::GetStatistics");
+    // if (table_info.expired()) {
+    //     throw InvalidInputException("GraphArTableEntry::GetStatistics: table_info is expired");
+    // }
+    // auto tmp_table_info = table_info.lock();
+    // if (tmp_table_info->GetType() == GraphArTableType::Vertex) {
+    //     if (column_id > 0) {
+    //         return nullptr;
+    //     }
+    //     auto result = NumericStats::CreateEmpty(duckdb::LogicalType::BIGINT);
+    //     NumericStats::SetMin(result, 0);
+    //     NumericStats::SetMax(result, GraphArFunctions::GetVertexNum(tmp_table_info->GetCatalog().GetGraphInfo(),
+    //     tmp_table_info->GetParams()[0]) - 1); return result.ToUnique();
+    // } else {
+    //     if (column_id > 1) {
+    //         return nullptr;
+    //     }
+    //     auto result = NumericStats::CreateEmpty(duckdb::LogicalType::BIGINT);
+    //     NumericStats::SetMin(result, 0);
+    //     NumericStats::SetMax(result, GraphArFunctions::GetVertexNum(tmp_table_info->GetCatalog().GetGraphInfo(),
+    //     tmp_table_info->GetParams()[column_id == 0 ? 0 : 2]) - 1); return result.ToUnique();
+    // }
+    // return nullptr;
+    throw NotImplementedException("GraphArTableEntry::GetStatistics");
 }
 
 TableFunction GraphArTableEntry::GetScanFunction(ClientContext& context, unique_ptr<FunctionData>& bind_data) {
@@ -35,19 +59,18 @@ TableFunction GraphArTableEntry::GetScanFunction(ClientContext& context, unique_
     DUCKDB_GRAPHAR_LOG_TRACE("GraphArTableEntry::GetScanFunction");
     auto bind_data_ = make_uniq<ReadBindData>();
     auto tmp_table_info = table_info.lock();
+    const auto graph_info = tmp_table_info->GetCatalog().GetGraphInfo();
     switch (tmp_table_info->GetType()) {
         case GraphArTableType::Vertex:
-            ReadVertices::SetBindData(
-                tmp_table_info->GetCatalog().GetGraphInfo(),
-                *tmp_table_info->GetCatalog().GetGraphInfo()->GetVertexInfo(tmp_table_info->GetParams()[0]),
-                bind_data_);
+            ReadVertices::SetBindData(graph_info, graph_info->GetVertexInfo(tmp_table_info->GetParams()[0]),
+                                      bind_data_);
             bind_data = std::move(bind_data_);
             return ReadVertices::GetScanFunction();
         case GraphArTableType::Edge:
             ReadEdges::SetBindData(
-                tmp_table_info->GetCatalog().GetGraphInfo(),
-                *tmp_table_info->GetCatalog().GetGraphInfo()->GetEdgeInfo(
-                    tmp_table_info->GetParams()[0], tmp_table_info->GetParams()[1], tmp_table_info->GetParams()[2]),
+                graph_info,
+                graph_info->GetEdgeInfo(tmp_table_info->GetParams()[0], tmp_table_info->GetParams()[1],
+                                        tmp_table_info->GetParams()[2]),
                 bind_data_);
             bind_data = std::move(bind_data_);
             return ReadEdges::GetScanFunction();
