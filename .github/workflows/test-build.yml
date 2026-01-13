@@ -105,7 +105,7 @@ jobs:
           cd duckdb
           git fetch --tags origin
           cd ..
-          DUCKDB_GIT_VERSION=v1.4.0 make set_duckdb_version
+          DUCKDB_GIT_VERSION=v1.4.1 make set_duckdb_version
 
       - name: Build
         run: |
