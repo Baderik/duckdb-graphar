@@ -3,6 +3,7 @@
 #include "utils/global_log_manager.hpp"
 
 #include <arrow/api.h>
+
 #include <graphar/api/info.h>
 
 namespace duckdb {

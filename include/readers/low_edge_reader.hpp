@@ -5,6 +5,7 @@
 
 #include <duckdb/main/connection.hpp>
 #include <duckdb/main/query_result.hpp>
+
 #include <graphar/api/info.h>
 
 namespace duckdb {

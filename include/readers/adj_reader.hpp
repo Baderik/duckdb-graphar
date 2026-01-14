@@ -3,6 +3,7 @@
 #include "utils/global_log_manager.hpp"
 
 #include <arrow/api.h>
+
 #include <graphar/api/arrow_reader.h>
 #include <graphar/api/info.h>
 
