@@ -74,12 +74,6 @@ struct GraphArFunctions {
                                                           const std::string& filter_column);
 };
 
-inline std::pair<int64_t, int64_t> GetChunkAndOffset(graphar::IdType chunk_size, graphar::IdType offset) {
-    int64_t chunk_num = offset / chunk_size;
-    int64_t offset_in_chunk = offset % chunk_size;
-    return std::make_pair(chunk_num, offset_in_chunk);
-}
-
 static void release_children_only(struct ArrowArray* array) {
     if (array == nullptr) return;
 

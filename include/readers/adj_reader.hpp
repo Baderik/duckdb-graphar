@@ -8,6 +8,12 @@
 
 namespace duckdb {
 
+inline std::pair<int64_t, int64_t> GetChunkAndOffset(graphar::IdType chunk_size, graphar::IdType offset) {
+    int64_t chunk_num = offset / chunk_size;
+    int64_t offset_in_chunk = offset % chunk_size;
+    return std::make_pair(chunk_num, offset_in_chunk);
+}
+
 class MyAdjReaderOrdSrc {
 public:
     MyAdjReaderOrdSrc(const std::shared_ptr<graphar::EdgeInfo> edge_info, const std::string& prefix)
