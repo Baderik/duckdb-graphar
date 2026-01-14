@@ -40,7 +40,8 @@ public:
         for (auto& el : paths) {
             paths_val.emplace_back(prefix + el);
         }
-        std::string query = "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
+        std::string query =
+            "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
             "WHERE file_row_number BETWEEN $2 AND ($2 + $3 - 1);";
         auto offset_in_chunk = offset.first % edge_info->GetChunkSize();
         auto count = offset.second - offset.first;
@@ -80,4 +81,4 @@ private:
     std::unique_ptr<QueryResult> result = nullptr;
     std::shared_ptr<OffsetReader> offset_reader;
 };
-} // namespace duckdb
+}  // namespace duckdb
