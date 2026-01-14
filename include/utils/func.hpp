@@ -290,7 +290,8 @@ public:
         for (auto& el : paths) {
             paths_val.emplace_back(prefix + el);
         }
-        std::string query = "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
+        const std::string query =
+            "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
             "WHERE file_row_number BETWEEN $2 AND ($2 + $3 - 1);";
         auto offset_in_chunk = offset.first % edge_info->GetChunkSize();
         auto count = offset.second - offset.first;
