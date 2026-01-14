@@ -1,5 +1,6 @@
 #pragma once
 
+#include "readers/low_edge_reader.hpp"
 #include "utils/func.hpp"
 
 #include <duckdb/common/named_parameter_map.hpp>
