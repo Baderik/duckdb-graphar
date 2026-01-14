@@ -16,8 +16,6 @@ public:
     TwoHopThreadsBindData(std::string edge_info_path, graphar::IdType vid)
         : edge_info_path(edge_info_path), vid(vid) {};
 
-    idx_t MaxThreads() const { return 12; }
-
 public:
     const std::string edge_info_path;
     const graphar::IdType vid;
@@ -26,8 +24,6 @@ public:
 struct TwoHopThreadsGlobalState {
 public:
     TwoHopThreadsGlobalState(ClientContext& context, const TwoHopThreadsBindData& bind_data) {};
-
-    idx_t MaxThreads() const { return 12; }
 
 public:
     std::queue<std::unique_ptr<LowEdgeReaderByVertex>> vertex_readers;
@@ -43,7 +39,7 @@ public:
 
     TwoHopThreadsGlobalState& GetState() { return state; }
 
-    idx_t MaxThreads() const { return 12; }
+    idx_t MaxThreads() const override { GlobalTableFunctionState::MAX_THREADS }
 
 private:
     TwoHopThreadsGlobalState state;
@@ -55,7 +51,6 @@ public:
 
     static unique_ptr<LocalTableFunctionState> Init(ExecutionContext& context, TableFunctionInitInput& input,
                                                     GlobalTableFunctionState* global_state);
-    idx_t MaxThreads() const { return 12; }
 };
 
 struct TwoHopThreads {

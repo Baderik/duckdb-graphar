@@ -290,8 +290,8 @@ public:
         for (auto& el : paths) {
             paths_val.emplace_back(prefix + el);
         }
-        std::string query = "SELECT * FROM read_parquet($1) OFFSET $2 LIMIT $3;";
-        // CHECK: Granted query result save raws order? OFFSET and LIMIT need it
+        std::string query = "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
+            "WHERE file_row_number BETWEEN $2 AND ($2 + $3 - 1);";
         auto offset_in_chunk = offset.first % edge_info->GetChunkSize();
         auto count = offset.second - offset.first;
         Value path_list_val = Value::LIST(paths_val);
@@ -299,19 +299,13 @@ public:
     }
 
     std::vector<std::string> GetChunkPaths() {
-        // DUCKDB_GRAPHAR_LOG_DEBUG("LowEdgeReaderByVertex::GetChunkPaths");
         auto range = GetChunkRange();
         auto begin_chunk = range.first, end_chunk = range.second;
         std::vector<std::string> chunks(end_chunk - begin_chunk);
         for (int chunk_index = begin_chunk; chunk_index < end_chunk; ++chunk_index) {
             chunks[chunk_index - begin_chunk] =
                 edge_info->GetAdjListFilePath(vertex_chunk_index, chunk_index, adj_list_type).value();
-
-            //                GAR_ASSIGN_OR_RAISE(chunks[chunk_index - begin_chunk],
-            //                      edge_info->GetAdjListFilePath(vertex_chunk_index, chunk_index, adj_list_type));
         }
-        // DUCKDB_GRAPHAR_LOG_DEBUG(prefix);
-        // DUCKDB_GRAPHAR_LOG_DEBUG(chunks[0]);
 
         return std::move(chunks);
     }
