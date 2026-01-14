@@ -1,5 +1,6 @@
 #pragma once
 
+#include "readers/offset_reader.hpp"
 #include "utils/global_log_manager.hpp"
 
 #include <arrow/api.h>
@@ -11,8 +12,6 @@
 #include <duckdb/function/table/arrow.hpp>
 #include <duckdb/function/table/arrow/arrow_type_info.hpp>
 #include <duckdb/function/table/arrow/enum/arrow_type_info_type.hpp>
-#include <duckdb/main/connection.hpp>
-#include <duckdb/main/query_result.hpp>
 
 #include <graphar/api/arrow_reader.h>
 #include <graphar/reader_util.h>
@@ -73,12 +72,6 @@ struct GraphArFunctions {
                                                           const std::string& filter_column);
 };
 
-inline std::pair<int64_t, int64_t> GetChunkAndOffset(graphar::IdType chunk_size, graphar::IdType offset) {
-    int64_t chunk_num = offset / chunk_size;
-    int64_t offset_in_chunk = offset % chunk_size;
-    return std::make_pair(chunk_num, offset_in_chunk);
-}
-
 static void release_children_only(struct ArrowArray* array) {
     if (array == nullptr) return;
 
@@ -94,248 +87,6 @@ template <typename Array>
 static int64_t GetInt64Value(std::shared_ptr<Array> array, int64_t index) {
     return std::static_pointer_cast<arrow::Int64Scalar>(array->GetScalar(index).ValueOrDie())->value;
 }
-
-class MyAdjReaderOrdSrc {
-public:
-    MyAdjReaderOrdSrc(const std::shared_ptr<graphar::EdgeInfo> edge_info, const std::string& prefix)
-        : edge_info_(edge_info),
-          prefix_(prefix),
-          reader_(graphar::AdjListArrowChunkReader::Make(edge_info, graphar::AdjListType::ordered_by_source, prefix)
-                      .value()) {}
-    void find_src(graphar::IdType src) {
-        reader_->seek_src(src);
-        std::pair<graphar::IdType, graphar::IdType> range =
-            (graphar::util::GetAdjListOffsetOfVertex(edge_info_, prefix_, graphar::AdjListType::ordered_by_source, src)
-                 .value());
-        auto chunk_size = edge_info_->GetChunkSize();
-        size_ = range.second - range.first;
-        start_ = GetChunkAndOffset(chunk_size, range.first);
-        end_ = GetChunkAndOffset(chunk_size, range.second);
-        if (start_.first == end_.first) {
-            if (start_.second == end_.second) {
-                chunk_count_ = 0;
-            } else {
-                chunk_count_ = 1;
-            }
-        } else {
-            chunk_count_ = end_.first - start_.first;
-            if (end_.second != 0) {
-                chunk_count_++;
-            }
-        }
-        is_empty_ = true;
-    }
-
-    bool has_next_table() { return chunk_i_ + 1 < chunk_count_; }
-
-    bool finish_table() const { return chunk_i_ >= chunk_count_; }
-
-    std::shared_ptr<arrow::Table> get_table() {
-        auto table = reader_->GetChunk().value();
-
-        if (chunk_i_ == chunk_count_ - 1 && end_.second != 0) {
-            if (start_.first == end_.first) {
-                return table->Slice(0, end_.second - start_.second);
-            }
-            return table->Slice(0, end_.second);
-        }
-        return table;
-    }
-
-    void next_table() {
-        reader_->next_chunk();
-        chunk_i_++;
-    }
-
-    std::shared_ptr<arrow::Table> get(int64_t count) {
-        if (is_empty_) {
-            table_ = get_table();
-            offset_ = 0;
-            is_empty_ = false;
-        }
-
-        auto result = table_->Slice(offset_, count);
-        offset_ += count;
-        if (offset_ >= table_->num_rows()) {
-            if (has_next_table()) {
-                next_table();
-                offset_ = 0;
-            }
-        }
-        return result;
-    }
-
-    bool finish() {
-        if (is_empty_) {
-            if (finish_table()) {
-                return true;
-            }
-            table_ = get_table();
-            offset_ = 0;
-            is_empty_ = false;
-        }
-        if (offset_ >= table_->num_rows()) {
-            return true;
-        }
-        return false;
-    }
-
-    int64_t size() { return size_; }
-
-private:
-    const std::shared_ptr<graphar::EdgeInfo> edge_info_;
-    const std::string prefix_;
-    int64_t size_ = 0;
-    std::shared_ptr<graphar::AdjListArrowChunkReader> reader_;
-    std::pair<int64_t, int64_t> start_;
-    std::pair<int64_t, int64_t> end_;
-    int64_t chunk_count_ = 0, chunk_i_ = 0;
-    int64_t offset_ = 0;
-    std::shared_ptr<arrow::Table> table_;
-    bool is_empty_ = false;
-};
-
-class OffsetReader {
-public:
-    OffsetReader(const std::shared_ptr<graphar::EdgeInfo> edge_info, const std::string& prefix,
-                 graphar::AdjListType adj_list_type)
-        : edge_info(edge_info), prefix(prefix), adj_list_type(adj_list_type), current_offset_chunk_index(-1) {
-        DUCKDB_GRAPHAR_LOG_TRACE("OffsetReader::Constructor");
-
-        if (adj_list_type == graphar::AdjListType::ordered_by_source) {
-            vertex_chunk_size = edge_info->GetSrcChunkSize();
-        } else if (adj_list_type == graphar::AdjListType::ordered_by_dest) {
-            vertex_chunk_size = edge_info->GetDstChunkSize();
-        } else {
-            throw std::runtime_error("The adj list type has to be ordered_by_source or ordered_by_dest, but got " +
-                                     std::string(graphar::AdjListTypeToString(adj_list_type)));
-        }
-
-        fs = graphar::FileSystemFromUriOrPath(prefix, &out_prefix).value();
-        auto adjacent_list = edge_info->GetAdjacentList(adj_list_type);
-        if (adjacent_list == nullptr) {
-            throw std::runtime_error("The adjacent list is not set for adj list type " +
-                                     std::string(graphar::AdjListTypeToString(adj_list_type)));
-        }
-
-        file_type = adjacent_list->GetFileType();
-    }
-
-    void OpenTable(graphar::IdType vid) {
-        DUCKDB_GRAPHAR_LOG_TRACE("OffsetReader::OpenTable");
-        graphar::IdType offset_chunk_index = vid / vertex_chunk_size;
-
-        if (offset_chunk_index != current_offset_chunk_index) {
-            auto offset_file_path = edge_info->GetAdjListOffsetFilePath(offset_chunk_index, adj_list_type).value();
-
-            std::string path = out_prefix + offset_file_path;
-
-            current_table = fs->ReadFileToTable(path, file_type).value();
-        }
-    }
-
-    std::pair<graphar::IdType, graphar::IdType> GetOffset(graphar::IdType vid) {
-        DUCKDB_GRAPHAR_LOG_TRACE("OffsetReader::GetOffset");
-        OpenTable(vid);
-
-        graphar::IdType offset_in_file = vid % vertex_chunk_size;
-
-        auto array =
-            std::static_pointer_cast<arrow::Int64Array>(current_table->column(0)->Slice(offset_in_file, 2)->chunk(0));
-
-        return std::make_pair(static_cast<graphar::IdType>(array->Value(0)),
-                              static_cast<graphar::IdType>(array->Value(1)));
-    }
-
-public:
-    graphar::IdType vertex_chunk_size;
-    const std::shared_ptr<graphar::EdgeInfo> edge_info;
-    const std::string& prefix;
-    const graphar::AdjListType adj_list_type;
-    std::shared_ptr<arrow::Table> current_table;
-    std::shared_ptr<graphar::FileSystem> fs;
-    std::string out_prefix;
-    graphar::IdType current_offset_chunk_index;
-    graphar::FileType file_type;
-};
-
-class LowEdgeReaderByVertex {
-public:
-    LowEdgeReaderByVertex(const std::shared_ptr<graphar::EdgeInfo> edge_info, const std::string& prefix,
-                          graphar::AdjListType adj_list_type, std::shared_ptr<OffsetReader> offset_reader)
-        : edge_info(edge_info), prefix(prefix), adj_list_type(adj_list_type), offset_reader(offset_reader) {}
-
-    void SetVertex(graphar::IdType vid) {
-        DUCKDB_GRAPHAR_LOG_TRACE("Reader::SetVertex");
-        offset = offset_reader->GetOffset(vid);
-        vertex_chunk_index = vid / offset_reader->vertex_chunk_size;
-        result = nullptr;
-    }
-
-    unique_ptr<DataChunk> read() {
-        DUCKDB_GRAPHAR_LOG_TRACE("Reader::read");
-        if (!started()) {
-            throw NotImplementedException("Reader for Vertex not started");
-        }
-        return std::move(result->Fetch());
-    }
-
-    bool started() { return (result != nullptr); }
-
-    void start(std::unique_ptr<Connection> conn) {
-        DUCKDB_GRAPHAR_LOG_TRACE("Reader::start");
-        auto paths = GetChunkPaths();
-        vector<Value> paths_val;
-        paths_val.reserve(paths.size());
-        for (auto& el : paths) {
-            paths_val.emplace_back(prefix + el);
-        }
-        std::string query = "SELECT * FROM read_parquet($1) OFFSET $2 LIMIT $3;";
-        // CHECK: Granted query result save raws order? OFFSET and LIMIT need it
-        auto offset_in_chunk = offset.first % edge_info->GetChunkSize();
-        auto count = offset.second - offset.first;
-        Value path_list_val = Value::LIST(paths_val);
-        result = std::move(conn->Query(query, path_list_val, offset_in_chunk, count));
-    }
-
-    std::vector<std::string> GetChunkPaths() {
-        // DUCKDB_GRAPHAR_LOG_DEBUG("LowEdgeReaderByVertex::GetChunkPaths");
-        auto range = GetChunkRange();
-        auto begin_chunk = range.first, end_chunk = range.second;
-        std::vector<std::string> chunks(end_chunk - begin_chunk);
-        for (int chunk_index = begin_chunk; chunk_index < end_chunk; ++chunk_index) {
-            chunks[chunk_index - begin_chunk] =
-                edge_info->GetAdjListFilePath(vertex_chunk_index, chunk_index, adj_list_type).value();
-
-            //                GAR_ASSIGN_OR_RAISE(chunks[chunk_index - begin_chunk],
-            //                      edge_info->GetAdjListFilePath(vertex_chunk_index, chunk_index, adj_list_type));
-        }
-        // DUCKDB_GRAPHAR_LOG_DEBUG(prefix);
-        // DUCKDB_GRAPHAR_LOG_DEBUG(chunks[0]);
-
-        return std::move(chunks);
-    }
-
-    std::pair<graphar::IdType, graphar::IdType> GetChunkRange() {
-        auto end_chunk = offset.second / edge_info->GetChunkSize();
-        if (offset.second % edge_info->GetChunkSize() != 0) {
-            ++end_chunk;
-        }
-
-        return std::make_pair(offset.first / edge_info->GetChunkSize(), end_chunk);
-    };
-
-    long long size() { return offset.second - offset.first; }
-
-private:
-    const std::shared_ptr<graphar::EdgeInfo> edge_info;
-    const std::string prefix;
-    graphar::AdjListType adj_list_type;
-    pair<graphar::IdType, graphar::IdType> offset;
-    graphar::IdType vertex_chunk_index;
-    std::unique_ptr<QueryResult> result = nullptr;
-    std::shared_ptr<OffsetReader> offset_reader;
-};
 
 inline void PrintArrowTable(const std::shared_ptr<arrow::Table>& table, int64_t limit = 0) {
     int64_t num_rows = table->num_rows();

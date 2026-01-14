@@ -1,5 +1,7 @@
 #pragma once
 
+#include "readers/adj_reader.hpp"
+#include "readers/low_edge_reader.hpp"
 #include "utils/func.hpp"
 
 #include <duckdb/common/named_parameter_map.hpp>
@@ -7,7 +9,6 @@
 #include <duckdb/main/extension/extension_loader.hpp>
 
 #include <graphar/api/high_level_reader.h>
-#include <graphar/graph_info.h>
 
 namespace duckdb {
 
