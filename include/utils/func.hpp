@@ -72,17 +72,6 @@ struct GraphArFunctions {
                                                           const std::string& filter_column);
 };
 
-static void release_children_only(struct ArrowArray* array) {
-    if (array == nullptr) return;
-
-    if (array->children != nullptr) {
-        free(array->children);
-        array->children = nullptr;
-    }
-
-    array->release = nullptr;
-}
-
 template <typename Array>
 static int64_t GetInt64Value(std::shared_ptr<Array> array, int64_t index) {
     return std::static_pointer_cast<arrow::Int64Scalar>(array->GetScalar(index).ValueOrDie())->value;

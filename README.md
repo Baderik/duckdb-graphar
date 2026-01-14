@@ -28,13 +28,21 @@ This extension requires the following dependencies:
 ### Build extension:
 
 Development Build:
+
 ```bash
 mkdir build && cd build
-cmake .. -DLOAD_TESTS=ON
+cmake .. -DLOAD_TESTS=ON -DENABLE_UNIT_TESTS=ON
 make
 ```
 
 Run test:
+
 ```bash
 ./build/_deps/duckdb-build/test/unittest "[graphar]"
+```
+
+Run Unittests for extension:
+
+```bash
+./build/_deps/duckdb-build/extension/duckdb_graphar/tests/unittest_graphar
 ```
