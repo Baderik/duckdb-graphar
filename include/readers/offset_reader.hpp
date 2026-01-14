@@ -70,4 +70,4 @@ public:
     graphar::IdType current_offset_chunk_index;
     graphar::FileType file_type;
 };
-}
+}  // namespace duckdb
