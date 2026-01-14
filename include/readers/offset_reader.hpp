@@ -5,6 +5,8 @@
 #include <arrow/api.h>
 #include <graphar/api/info.h>
 
+namespace duckdb {
+
 class OffsetReader {
 public:
     OffsetReader(const std::shared_ptr<graphar::EdgeInfo> edge_info, const std::string& prefix,
@@ -68,3 +70,4 @@ public:
     graphar::IdType current_offset_chunk_index;
     graphar::FileType file_type;
 };
+}
