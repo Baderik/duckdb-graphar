@@ -39,7 +39,7 @@ public:
 
     TwoHopThreadsGlobalState& GetState() { return state; }
 
-    idx_t MaxThreads() const override { GlobalTableFunctionState::MAX_THREADS }
+    idx_t MaxThreads() const override { return GlobalTableFunctionState::MAX_THREADS; }
 
 private:
     TwoHopThreadsGlobalState state;
