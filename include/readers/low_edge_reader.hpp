@@ -47,6 +47,7 @@ public:
         auto offset_in_chunk = offset.first % edge_info->GetChunkSize();
         auto count = offset.second - offset.first;
         Value path_list_val = Value::LIST(paths_val);
+        DUCKDB_GRAPHAR_LOG_TRACE("Reader::params: " + offset_in_chunk.to_string() + " " + count.to_string());
         result = std::move(conn->Query(query, path_list_val, offset_in_chunk, count));
     }
 
