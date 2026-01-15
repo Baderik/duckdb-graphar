@@ -14,7 +14,7 @@ class LowEdgeReaderByVertex {
 public:
     LowEdgeReaderByVertex(const std::shared_ptr<graphar::EdgeInfo> edge_info, const std::string& prefix,
                           graphar::AdjListType adj_list_type, std::shared_ptr<OffsetReader> offset_reader)
-        : edge_info(edge_info), prefix(prefix), adj_list_type(adj_list_type), offset_reader(offset_reader) {}
+        : edge_info(edge_info), prefix(prefix), adj_list_type(adj_list_type), file_type(edge_info->GetAdjacentList(adj_list_type)->GetFileType()), offset_reader(offset_reader) {}
 
     void SetVertex(graphar::IdType vid) {
         DUCKDB_GRAPHAR_LOG_TRACE("Reader::SetVertex");
@@ -41,9 +41,7 @@ public:
         for (auto& el : paths) {
             paths_val.emplace_back(prefix + el);
         }
-        std::string query =
-            "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
-            "WHERE file_row_number BETWEEN $2 AND ($2 + $3 - 1);";
+        std::string query = GetQuery();
         auto offset_in_chunk = offset.first % edge_info->GetChunkSize();
         auto count = offset.second - offset.first;
         Value path_list_val = Value::LIST(paths_val);
@@ -71,12 +69,28 @@ public:
         return std::make_pair(offset.first / edge_info->GetChunkSize(), end_chunk);
     };
 
-    long long size() { return offset.second - offset.first; }
+    const long long size() { return offset.second - offset.first; }
+
+    const string GetQuery() {
+        switch (file_type)
+        {
+        case graphar::PARQUET:
+            return 
+                "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
+                "WHERE file_row_number BETWEEN $2 AND ($2 + $3 - 1);";
+        case graphar::CSV:
+            return "SELECT #1, #2 FROM read_csv($1, skip=($2 - 1), header=false) LIMIT $3;";
+        
+        default:
+            throw NotImplementedException("LowEdgeReaderByVertex:: Unsupported file type of adj file");
+        }
+    }
 
 private:
     const std::shared_ptr<graphar::EdgeInfo> edge_info;
     const std::string prefix;
     graphar::AdjListType adj_list_type;
+    graphar::FileType file_type;
     pair<graphar::IdType, graphar::IdType> offset;
     graphar::IdType vertex_chunk_index;
     std::unique_ptr<QueryResult> result = nullptr;
