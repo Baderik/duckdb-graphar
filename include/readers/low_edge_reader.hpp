@@ -82,7 +82,7 @@ public:
                 return "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
                        "WHERE file_row_number BETWEEN $2 AND ($2 + $3 - 1);";
             case graphar::CSV:
-                return "SELECT #1, #2 FROM read_csv($1, skip=$2) LIMIT $3;";
+                return "SELECT #1, #2 FROM read_csv($1, skip=($2 + 1)) LIMIT $3;";
             default:
                 throw NotImplementedException("LowEdgeReaderByVertex:: Unsupported file type of adj file");
         }
