@@ -14,7 +14,9 @@ class LowEdgeReaderByVertex {
 public:
     LowEdgeReaderByVertex(const std::shared_ptr<graphar::EdgeInfo> edge_info, const std::string& prefix,
                           graphar::AdjListType adj_list_type, std::shared_ptr<OffsetReader> offset_reader)
-        : edge_info(edge_info), prefix(prefix), adj_list_type(adj_list_type),
+        : edge_info(edge_info),
+          prefix(prefix),
+          adj_list_type(adj_list_type),
           file_type(edge_info->GetAdjacentList(adj_list_type)->GetFileType()),
           offset_reader(offset_reader) {}
 
@@ -76,14 +78,13 @@ public:
 
     const string GetQuery() {
         switch (file_type) {
-        case graphar::PARQUET:
-            return 
-                "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
-                "WHERE file_row_number BETWEEN $2 AND ($2 + $3 - 1);";
-        case graphar::CSV:
-            return "SELECT #1, #2 FROM read_csv($1, skip=$2) LIMIT $3;";
-        default:
-            throw NotImplementedException("LowEdgeReaderByVertex:: Unsupported file type of adj file");
+            case graphar::PARQUET:
+                return "SELECT #1, #2 FROM read_parquet($1, file_row_number=true) "
+                       "WHERE file_row_number BETWEEN $2 AND ($2 + $3 - 1);";
+            case graphar::CSV:
+                return "SELECT #1, #2 FROM read_csv($1, skip=$2) LIMIT $3;";
+            default:
+                throw NotImplementedException("LowEdgeReaderByVertex:: Unsupported file type of adj file");
         }
     }
 
