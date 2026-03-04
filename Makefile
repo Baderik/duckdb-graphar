@@ -83,7 +83,7 @@ $(GRAPHAR_CLONED): $(ARROW_INSTALLED)
 	@echo "Clone Apache GraphAr"
 	rm -rf $(GRAPHAR_DIR)
 	mkdir -p $(GRAPHAR_DIR)
-	git clone https://github.com/apache/incubator-graphar.git $(GRAPHAR_SRC_DIR)
+	git clone https://github.com/lithium-tech/incubator-graphar $(GRAPHAR_SRC_DIR)
 	@touch $(GRAPHAR_CLONED)
 
 $(GRAPHAR_BUILT): $(GRAPHAR_CLONED)
