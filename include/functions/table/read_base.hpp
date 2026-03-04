@@ -107,6 +107,7 @@ static bool IsNullPtr(ReaderPtr& reader) {
 }
 
 static idx_t ReserveRowsToRead(ReaderPtr& reader) {
+    // DUCKDB_GRAPHAR_LOG_DEBUG("ReserveRowsToRead function");
     return std::visit([&](auto& r) { return r->ReserveRowsToRead(); }, reader);
 }
 
@@ -119,6 +120,8 @@ class ReadBase;
 
 class ReadVertices;
 class ReadEdges;
+class ReadHop;
+class ReadHopGlobalTableFunctionState;
 
 class ReadBindData : public TableFunctionData {
 public:
@@ -149,6 +152,7 @@ private:
     friend class ReadBase;
     friend class ReadVertices;
     friend class ReadEdges;
+    friend class ReadHop;
 };
 
 class ReadBaseGlobalTableFunctionState : public GlobalTableFunctionState {
@@ -180,6 +184,8 @@ private:
     friend class ReadBase;
     friend class ReadVertices;
     friend class ReadEdges;
+    friend class ReadHop;
+    friend class ReadHopGlobalTableFunctionState;
 };
 
 class ReadBaseLocalTableFunctionState : public LocalTableFunctionState {
@@ -192,6 +198,7 @@ private:
     friend class ReadBase;
     friend class ReadVertices;
     friend class ReadEdges;
+    friend class ReadHop;
 };
 
 template <typename ReadFinal>

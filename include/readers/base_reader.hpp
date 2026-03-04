@@ -96,6 +96,7 @@ public:
         filter_info->offset_rows = vid_range.first % chunk_size;
         filter_info->last_chunk_rows = (vid_range.second - 1) % chunk_size + 1;
         filter_info->total_chunks = (vid_range.second - 1) / chunk_size - vid_range.first / chunk_size + 1;
+        chunk_count = 0;
     }
 
     void FilterByRangeEdge(const std::pair<int64_t, int64_t>& vid_range, const std::string& filter_column,
@@ -129,6 +130,7 @@ public:
         filter_info->offset_rows = offset_pair.first % chunk_size;
         filter_info->last_chunk_rows = (offset_pair.second - 1) % chunk_size + 1;
         filter_info->total_chunks = (offset_pair.second - 1) / chunk_size - offset_pair.first / chunk_size + 1;
+        chunk_count = 0;
     }
 
 private:

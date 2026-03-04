@@ -79,7 +79,7 @@ unique_ptr<FunctionData> ReadEdges::Bind(ClientContext& context, TableFunctionBi
 //-------------------------------------------------------------------
 BaseReaderPtr ReadEdges::GetBaseReader(ClientContext& context, ReadBaseGlobalTableFunctionState& gstate, idx_t ind,
                                        const std::string& filter_column) {
-    DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetReader");
+    DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetBaseReader");
     graphar::AdjListType adj_list_type;
     if (filter_column == "" or filter_column == SRC_GID_COLUMN) {
         adj_list_type = graphar::AdjListType::ordered_by_source;

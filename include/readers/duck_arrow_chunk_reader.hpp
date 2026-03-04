@@ -35,9 +35,13 @@ public:
     }
 
     idx_t ReserveRowsToRead() {
+        // std::cout << "Reader::ReserveRowsToRead" << std::endl;
+        // DUCKDB_GRAPHAR_LOG_DEBUG("ReserveRowsToRead::ReserveRowsToRead");
         if (!cur_chunk || read_rows == cur_chunk->size()) {
             auto gc_result = base->GetChunk();
             if (gc_result.no_more_chunks) {
+                // std::cout << "Reader::ReserveRowsToRead: no_more_chunks" << std::endl;
+                // DUCKDB_GRAPHAR_LOG_DEBUG("Reader::ReserveRowsToRead: no_more_chunks");
                 return 0;
             }
             auto maybe_arrow_table = gc_result.chunk;
@@ -50,8 +54,15 @@ public:
             }
             read_rows = 0;
             ConvertArrowTableToDataChunk(*arrow_table, *cur_chunk, proj_columns, context);
+
+            // std::cout << "Reader::ReserveRowsToRead::cur_chunk->size: " + std::to_string(cur_chunk->size()) << std::endl;
+            // DUCKDB_GRAPHAR_LOG_DEBUG("Reader::ReserveRowsToRead::cur_chunk->size: " + std::to_string(cur_chunk->size()));
         }
         return cur_chunk->size() - read_rows;
+    }
+
+    const bool NoMoreRows() {
+        return !cur_chunk || read_rows == cur_chunk->size();
     }
 
     graphar::Result<unique_ptr<DataChunk>> GetChunk(idx_t num_rows) {

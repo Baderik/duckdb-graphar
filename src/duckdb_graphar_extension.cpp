@@ -8,6 +8,7 @@
 #include "functions/table/hop_thread.hpp"
 #include "functions/table/read_edges.hpp"
 #include "functions/table/read_vertices.hpp"
+#include "functions/table/read_hop.hpp"
 #include "storage/graphar_storage.hpp"
 #include "utils/global_log_manager.hpp"
 
@@ -37,7 +38,9 @@ static void LoadInternal(ExtensionLoader& loader) {
     config.AddExtensionOption("graphar_time_logging", "Enable time logging for GraphAr requests.", LogicalType::BOOLEAN,
                               Value::BOOLEAN(false));
 
-    GlobalLogManager::Initialize(loader.GetDatabaseInstance());
+    GlobalLogManager::Initialize(loader.GetDatabaseInstance()
+    , duckdb::LogLevel::LOG_WARN
+);
 
     ReadVertices::Register(loader);
     ReadEdges::Register(loader);
@@ -46,6 +49,7 @@ static void LoadInternal(ExtensionLoader& loader) {
     TwoHop::Register(loader);
     OneMoreHop::Register(loader);
     TwoHopThreads::Register(loader);
+    ReadHop::Register(loader);
 
     config.storage_extensions["duckdb_graphar"] = make_uniq<GraphArStorageExtension>();
 }
