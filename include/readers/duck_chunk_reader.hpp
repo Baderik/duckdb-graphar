@@ -59,12 +59,14 @@ public:
     idx_t ReserveRowsToRead() {
         // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead");
         if (cur_chunk && read_rows < cur_chunk->size()) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead cur_chunk && read_rows < cur_chunk->size()");
+            // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead cur_chunk && read_rows <
+            // cur_chunk->size()");
             return cur_chunk->size() - read_rows;
         }
         read_rows = 0;
         if (cur_result && (cur_chunk = cur_result->Fetch())) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead cur_result && (cur_chunk = cur_result->Fetch()): " + std::to_string(cur_chunk->size()));
+            // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead cur_result && (cur_chunk =
+            // cur_result->Fetch()): " + std::to_string(cur_chunk->size()));
             return cur_chunk->size();
         }
         auto gc_result = base->GetChunk();
@@ -83,10 +85,8 @@ public:
         // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead cur_chunk size");
         return cur_chunk->size();
     }
-    
-    const bool NoMoreRows() {
-        return !(cur_chunk && read_rows < cur_chunk->size());
-    }
+
+    const bool NoMoreRows() { return !(cur_chunk && read_rows < cur_chunk->size()); }
 
     graphar::Result<duckdb::unique_ptr<duckdb::DataChunk>> GetChunk(duckdb::idx_t num_rows) {
         if (ReserveRowsToRead() == 0) {

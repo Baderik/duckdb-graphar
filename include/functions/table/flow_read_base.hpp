@@ -1,8 +1,6 @@
 #pragma once
 
-
 #include "functions/table/read_base.hpp"
-
 #include "readers/base_reader.hpp"
 #include "readers/duck_arrow_chunk_reader.hpp"
 #include "readers/duck_chunk_reader.hpp"
@@ -12,8 +10,6 @@
 #include "utils/type_info.hpp"
 
 #include <arrow/c/bridge.h>
-
-#include <boost/lockfree/queue.hpp>
 
 #include <duckdb/common/named_parameter_map.hpp>
 #include <duckdb/function/table/arrow.hpp>
@@ -28,6 +24,7 @@
 #include <graphar/graph_info.h>
 #include <graphar/reader_util.h>
 
+#include <boost/lockfree/queue.hpp>
 #include <filesystem>
 #include <iostream>
 #include <sstream>
@@ -37,8 +34,7 @@ namespace duckdb {
 
 class FlowReadBaseGlobalTableFunctionState : public ReadBaseGlobalTableFunctionState {
 private:
-    boost::lockfree::queue<int> vertexes; 
-
+    boost::lockfree::queue<int> vertexes;
 };
 
-}
+}  // namespace duckdb

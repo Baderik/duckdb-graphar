@@ -61,11 +61,9 @@ int64_t GetCountClass::GetCount(const std::string& name, const std::string& num_
     // GAR_ASSIGN_OR_RAISE_ERROR(auto num_file_path, type_info->GetVerticesNumFilePath());
     // num_file_path = graph_prefix + "vertex_count";
     GAR_ASSIGN_OR_RAISE_ERROR(auto fs, graphar::FileSystemFromUriOrPath(num_file_path));
-    GAR_ASSIGN_OR_RAISE_ERROR(auto vertex_num,
-                                fs->template ReadFileToValue<graphar::IdType>(num_file_path));
+    GAR_ASSIGN_OR_RAISE_ERROR(auto vertex_num, fs->template ReadFileToValue<graphar::IdType>(num_file_path));
 
     return count_cache[name] = vertex_num;
 }
-
 
 }  // namespace duckdb

@@ -12,7 +12,7 @@
 #include <graphar/graph_info.h>
 
 #include <cassert>
-#include <cxxabi.h> 
+#include <cxxabi.h>
 
 namespace duckdb {
 // class ReadHopBindData : public ReadBindData {
@@ -27,14 +27,11 @@ namespace duckdb {
 
 class ReadHopGlobalTableFunctionState : public ReadBaseGlobalTableFunctionState {
 public:
-static std::string demangle(const char* name) {
-    int status = -4;
-    std::unique_ptr<char, void(*)(void*)> res {
-        abi::__cxa_demangle(name, NULL, NULL, &status),
-        std::free
-    };
-    return (status == 0) ? res.get() : name;
-}
+    static std::string demangle(const char* name) {
+        int status = -4;
+        std::unique_ptr<char, void (*)(void*)> res{abi::__cxa_demangle(name, NULL, NULL, &status), std::free};
+        return (status == 0) ? res.get() : name;
+    }
     auto MoveBaseReaders(std::vector<graphar::IdType>::iterator state_iter) {
         std::lock_guard<std::mutex> lock(mtx);
         // moveCall ++;
@@ -48,8 +45,8 @@ static std::string demangle(const char* name) {
 
             const auto prefix = graph_info->GetPrefix();
             auto edge_info = *std::get_if<std::shared_ptr<graphar::EdgeInfo>>(&type_info);
-            // const auto 
-            
+            // const auto
+
             for (size_t i = 0; i < base_readers.size(); ++i) {
                 if (global_projected_inds[i].empty()) {
                     continue;
@@ -98,12 +95,10 @@ private:
     friend class ReadHop;
 };
 
-
 class ReadHop : public ReadBase<ReadHop> {
 public:
     static void SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info,
-                            std::shared_ptr<graphar::EdgeInfo> edge_info,
-                            unique_ptr<ReadBindData>& bind_data);
+                            std::shared_ptr<graphar::EdgeInfo> edge_info, unique_ptr<ReadBindData>& bind_data);
     static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
                                          vector<LogicalType>& return_types, vector<string>& names);
 
@@ -128,13 +123,10 @@ public:
                                                          GlobalTableFunctionState* gstate_ptr);
 
 private:
-static std::string demangle(const char* name) {
-    int status = -4;
-    std::unique_ptr<char, void(*)(void*)> res {
-        abi::__cxa_demangle(name, NULL, NULL, &status),
-        std::free
-    };
-    return (status == 0) ? res.get() : name;
-}
+    static std::string demangle(const char* name) {
+        int status = -4;
+        std::unique_ptr<char, void (*)(void*)> res{abi::__cxa_demangle(name, NULL, NULL, &status), std::free};
+        return (status == 0) ? res.get() : name;
+    }
 };
 }  // namespace duckdb
