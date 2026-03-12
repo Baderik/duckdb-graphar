@@ -27,9 +27,12 @@ GRAPHAR_INSTALLED = $(GRAPHAR_DIR)/.installed
 
 ARROW_ROOT=$(ARROW_INSTALL_DIR)
 GRAPHAR_ROOT=$(GRAPHAR_INSTALL_DIR)
+BUILD_DIR = ${PROJ_DIR}build
 
 # Include the Makefile from extension-ci-tools
 include extension-ci-tools/makefiles/duckdb_extension.Makefile
+
+$(BUILD_DIR)/CMakeCache.txt: $(THIRD_PARTY_CMAKE)
 
 $(ARROW_CLONED):
 	@echo "Clone Apache Arrow"
@@ -117,3 +120,4 @@ $(THIRD_PARTY_CMAKE): $(ARROW_INSTALLED) $(GRAPHAR_INSTALLED)
 configure_ci: $(THIRD_PARTY_CMAKE)
 release: $(THIRD_PARTY_CMAKE)
 debug: $(THIRD_PARTY_CMAKE)
+

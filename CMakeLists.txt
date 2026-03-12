@@ -42,15 +42,15 @@ include_directories(include)
 
 file(GLOB_RECURSE EXTENSION_SOURCES CONFIGURE_DEPENDS "${EXTENSION_ROOT_DIR}/src/*.cpp")
 
+set(EXTENSION_LIBRARIES
+        graphar
+        Arrow::arrow_static)
+
 message(LOG "Building static extension")
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 
 message(LOG "Building loadable extension")
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
-
-set(EXTENSION_LIBRARIES
-        graphar
-        Arrow::arrow_static)
 
 target_link_libraries(${EXTENSION_NAME} ${EXTENSION_LIBRARIES})
 target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXTENSION_LIBRARIES})

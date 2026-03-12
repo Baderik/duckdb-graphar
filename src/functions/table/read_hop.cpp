@@ -122,7 +122,7 @@ BaseReaderPtr ReadHop::GetBaseReader(ClientContext& context, ReadBaseGlobalTable
 //-------------------------------------------------------------------
 void ReadHop::SetFilter(ClientContext& context, ReadBaseGlobalTableFunctionState& gstate, idx_t ind,
                         const std::pair<int64_t, int64_t>& vid_range, const std::string& filter_column) {
-    DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::SetFilter");
+    DUCKDB_GRAPHAR_LOG_WARN("ReadHop::SetFilter");
     auto edge_info = *std::get_if<std::shared_ptr<graphar::EdgeInfo>>(&gstate.type_info);
     if (!edge_info) {
         throw InternalException("Failed to get edge info");
@@ -149,6 +149,10 @@ void ReadHop::SetFilter(ClientContext& context, ReadBaseGlobalTableFunctionState
         vid_range.second > vertex_num) {
         throw BinderException("Invalid filter vertex id range");
     }
+
+    std::visit([&](const auto& ptr) {
+        DUCKDB_GRAPHAR_LOG_WARN("ReadHop::SetFilter for base reader (" + std::to_string(ind) + "): " + demangle(typeid(ptr).name()) + " filter column: " + filter_column);
+    }, gstate.base_readers[ind]);
 
     FilterByRangeEdge(gstate.base_readers[ind], vid_range, filter_column, edge_info, prefix);
 }
@@ -338,13 +342,20 @@ unique_ptr<GlobalTableFunctionState> ReadHop::Init(ClientContext& context, Table
             if (local_projected_inds[i].empty()) {
                 continue;
             }
+
+            DUCKDB_GRAPHAR_LOG_WARN("Try get reader (" + std::to_string(i) + "): filter column: " +
+                                filter_column);
+
             gstate.base_readers[i] = std::move(GetBaseReader(context, gstate, i, filter_column));
 
-            // std::visit([&](const auto& ptr) {
-            //     DUCKDB_GRAPHAR_LOG_WARN("Generate reader (" + std::to_string(i) + "): " +
-            //     demangle(typeid(ptr).name()));
-            // }, gstate.base_readers[i]);
+            std::visit([&](const auto& ptr) {
+                DUCKDB_GRAPHAR_LOG_WARN("Generate reader (" + std::to_string(i) + "): " +
+                demangle(typeid(ptr).name()));
+            }, gstate.base_readers[i]);
         }
+
+
+        DUCKDB_GRAPHAR_LOG_WARN("Base reader generate finished");
     }
 
     DUCKDB_GRAPHAR_LOG_DEBUG("ReadHop::Init dstColumn " + std::to_string(gstate.dstColumn.first) + " " +
@@ -447,7 +458,7 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
         if (IsNullPtr(reader) || !num_rows) {
             continue;
         }
-        bool no_more_rows = std::visit([&](auto&& r) -> bool { r->NoMoreRows(); }, reader);
+        bool no_more_rows = std::visit([&](auto&& r) -> bool { return r->NoMoreRows(); }, reader);
         if (no_more_rows) {
             lstate.storage_state = gstate.storage_state;
         }
