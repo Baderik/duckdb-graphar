@@ -312,13 +312,13 @@ unique_ptr<GlobalTableFunctionState> ReadHop::Init(ClientContext& context, Table
     gstate.base_readers.resize(prop_types_size);
     if (gstate.column_ids.empty() ||
         gstate.column_ids.size() == 1 && gstate.column_ids[0] == COLUMN_IDENTIFIER_ROW_ID) {
-        DUCKDB_GRAPHAR_LOG_DEBUG("Returning any column");
+        DUCKDB_GRAPHAR_LOG_WARN("Returning any column");
         local_projected_inds[0].emplace_back(0);
         gstate.base_readers[0] = GetBaseReader(context, gstate, 0, filter_column);
         gstate.global_projected_inds[0].emplace_back(0);
     } else {
         // DUCKDB_GRAPHAR_LOG_DEBUG("Returning specific columns");
-        // DUCKDB_GRAPHAR_LOG_WARN("Base reader size " + std::to_string(gstate.base_readers.size()))
+        DUCKDB_GRAPHAR_LOG_WARN("Base reader size " + std::to_string(gstate.base_readers.size()))
         for (idx_t column_i = 0; column_i < gstate.column_ids.size(); ++column_i) {
             const auto& column_id = gstate.column_ids[column_i];
             const auto i = std::upper_bound(columns_pref_num.begin(), columns_pref_num.end(), column_id) -

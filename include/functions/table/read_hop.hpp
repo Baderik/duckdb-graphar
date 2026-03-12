@@ -15,15 +15,6 @@
 #include <cxxabi.h>
 
 namespace duckdb {
-// class ReadHopBindData : public ReadBindData {
-// public:
-//     graphar::IdType vid;
-// };
-
-// class ReadHopGlobalTableFunctionState : public ReadBindData {
-// public:
-//     graphar::IdType rootId;
-// }
 
 class ReadHopGlobalTableFunctionState : public ReadBaseGlobalTableFunctionState {
 public:
@@ -47,6 +38,7 @@ public:
             auto edge_info = *std::get_if<std::shared_ptr<graphar::EdgeInfo>>(&type_info);
             // const auto
 
+            DUCKDB_GRAPHAR_LOG_WARN("Before move readers");
             for (size_t i = 0; i < base_readers.size(); ++i) {
                 if (global_projected_inds[i].empty()) {
                     continue;
@@ -54,9 +46,9 @@ public:
 
                 auto& base_reader = base_readers[i];
 
-                // std::visit([&](const auto& ptr) {
-                //     DUCKDB_GRAPHAR_LOG_WARN("Current type reader: " + demangle(typeid(ptr).name()));
-                // }, base_reader);
+                std::visit([&](const auto& ptr) {
+                    DUCKDB_GRAPHAR_LOG_WARN("Current type reader: " + demangle(typeid(ptr).name()));
+                }, base_reader);
                 FilterByRangeEdge(base_reader, {*cur_iter, *cur_iter + 1}, SRC_GID_COLUMN, edge_info, prefix);
                 // base_reader->FilterByRangeEdge();
             }
