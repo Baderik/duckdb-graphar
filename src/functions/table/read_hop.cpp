@@ -273,6 +273,14 @@ unique_ptr<GlobalTableFunctionState> ReadHop::Init(ClientContext& context, Table
     for (size_t i = 0; i < bind_data.flatten_prop_names.size(); i++) {
         if (bind_data.flatten_prop_names[i] == DST_GID_COLUMN) {
             gstate.dstColumn.second = i;
+            break;
+        }
+    }
+
+    for (size_t i = 0; i < input.column_ids.size(); i++) {
+        if (input.column_ids[i] == gstate.dstColumn.second) {
+            gstate.dstColumn.second = i;
+            break;
         }
     }
 
