@@ -25,10 +25,8 @@ public:
     }
     auto MoveBaseReaders(std::vector<graphar::IdType>::iterator state_iter) {
         std::lock_guard<std::mutex> lock(mtx);
-        // moveCall ++;
         if (cur_iter == state_iter) {
             cur_iter++;
-            // moveReal ++;
 
             if (cur_iter == vertexes.end()) {
                 return cur_iter;
@@ -36,7 +34,6 @@ public:
 
             const auto prefix = graph_info->GetPrefix();
             auto edge_info = *std::get_if<std::shared_ptr<graphar::EdgeInfo>>(&type_info);
-            // const auto
 
             DUCKDB_GRAPHAR_LOG_WARN("Before move readers");
             for (size_t i = 0; i < base_readers.size(); ++i) {
@@ -45,21 +42,8 @@ public:
                 }
 
                 auto& base_reader = base_readers[i];
-
-                std::visit([&](const auto& ptr) {
-                    DUCKDB_GRAPHAR_LOG_WARN("Current type reader: " + demangle(typeid(ptr).name()));
-                }, base_reader);
                 FilterByRangeEdge(base_reader, {*cur_iter, *cur_iter + 1}, SRC_GID_COLUMN, edge_info, prefix);
-                // base_reader->FilterByRangeEdge();
             }
-            // for (auto& base_reader : base_readers) {
-
-            // std::visit([&](const auto& ptr) {
-            //     DUCKDB_GRAPHAR_LOG_WARN("Current type reader: " + demangle(typeid(ptr).name()));
-            // }, base_reader);
-            //     FilterByRangeEdge(base_reader, {*cur_iter, *cur_iter + 1}, SRC_GID_COLUMN, edge_info, prefix);
-            //     // base_reader->FilterByRangeEdge();
-            // }
         }
         return cur_iter;
     }
@@ -73,9 +57,6 @@ private:
 
     std::mutex mtx;
     bool storage_state = true;
-    // int localCount = 0;
-    // int moveCall = 0;
-    // int moveReal = 0;
 
     friend class ReadHop;
 };
