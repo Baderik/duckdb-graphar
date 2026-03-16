@@ -349,7 +349,7 @@ unique_ptr<GlobalTableFunctionState> ReadHop::Init(ClientContext& context, Table
 //-------------------------------------------------------------------
 unique_ptr<LocalTableFunctionState> ReadHop::InitLocal(ExecutionContext& context, TableFunctionInitInput& input,
                                                        GlobalTableFunctionState* gstate_ptr) {
-    DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::InitLocal");
+    DUCKDB_GRAPHAR_LOG_WARN("ReadHop::InitLocal");
     auto bind_data = input.bind_data->Cast<ReadBindData>();
 
     auto lstate_ptr = make_uniq<ReadHopLocalTableFunctionState>();
