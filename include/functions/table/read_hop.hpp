@@ -48,7 +48,7 @@ public:
         return cur_iter;
     }
 
-    std::pair<idx_t, column_t> dstColumn = {-1, -1};
+    column_t dstColumn = -1;
 
 private:
     std::vector<graphar::IdType> vertexes;

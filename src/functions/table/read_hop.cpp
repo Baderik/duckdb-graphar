@@ -212,14 +212,14 @@ unique_ptr<GlobalTableFunctionState> ReadHop::Init(ClientContext& context, Table
 
     for (size_t i = 0; i < bind_data.flatten_prop_names.size(); i++) {
         if (bind_data.flatten_prop_names[i] == DST_GID_COLUMN) {
-            gstate.dstColumn.second = i;
+            gstate.dstColumn = i;
             break;
         }
     }
     bool found_dst_column = false;
     for (size_t i = 0; i < input.column_ids.size(); i++) {
-        if (input.column_ids[i] == gstate.dstColumn.second) {
-            gstate.dstColumn.second = i;
+        if (input.column_ids[i] == gstate.dstColumn) {
+            gstate.dstColumn = i;
             found_dst_column = true;
             break;
         }
@@ -284,9 +284,6 @@ unique_ptr<GlobalTableFunctionState> ReadHop::Init(ClientContext& context, Table
             }
             local_projected_inds[i].emplace_back(projected_ind);
             gstate.global_projected_inds[i].emplace_back(column_i);
-            if (column_i == gstate.dstColumn.second) {
-                gstate.dstColumn.first = i;
-            }
         }
 
         for (idx_t i = 0; i < prop_types_size; ++i) {
@@ -302,8 +299,7 @@ unique_ptr<GlobalTableFunctionState> ReadHop::Init(ClientContext& context, Table
         }
     }
 
-    DUCKDB_GRAPHAR_LOG_DEBUG("ReadHop::Init dstColumn " + std::to_string(gstate.dstColumn.first) + " " +
-                             std::to_string(gstate.dstColumn.second));
+    DUCKDB_GRAPHAR_LOG_DEBUG("ReadHop::Init dstColumn " + std::to_string(gstate.dstColumn));
 
     DUCKDB_GRAPHAR_LOG_DEBUG("ReadHop::Init global_projected_inds");
 
@@ -395,6 +391,7 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
 
     // Need check readers not empty?
     bool no_more_rows = std::visit([&](auto&& r) -> bool { return r->NoMoreRows(); }, lstate.readers[0]);
+    DUCKDB_GRAPHAR_LOG_DEBUG("no more rows: " + std::to_string(no_more_rows));
     // State of readers equal ? (can use state of readers[0] for all) ?
     if (no_more_rows) {
         // no_more_rows -> try get chunk by new state of base_reader -> readers must use equal state of base_readers
@@ -453,8 +450,9 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
             }
         }
         if (lstate.storage_state) {
-            if (gstate.dstColumn.first != -1 && gstate.dstColumn.second != -1) {
-                const auto proj = gstate.global_projected_inds[gstate.dstColumn.first][gstate.dstColumn.second];
+            if (gstate.dstColumn != -1) {
+                const auto proj = gstate.dstColumn;
+
                 for (idx_t i = 0; i < num_rows; i++) {
                     auto v = output.data[proj].GetValue(i).GetValue<int64_t>();
                     // Need check uniq vertexes for 2 hop roots
