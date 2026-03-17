@@ -98,6 +98,18 @@ static void FilterByRangeEdge(BaseReaderPtr& reader, const std::pair<int64_t, in
         reader);
 }
 
+static void PrintFilterInfo(BaseReaderPtr& reader) {
+    return std::visit(
+        [&](auto& r) {
+            if constexpr (requires { r->PrintFilterInfo(); }) {
+                r->PrintFilterInfo();
+            } else {
+                throw InternalException("PrintFilterInfo not implemented for this reader");
+            }
+        },
+        reader);
+}
+
 static bool IsNullPtr(BaseReaderPtr& reader) {
     return std::visit([&](auto& r) { return (r == nullptr); }, reader);
 }

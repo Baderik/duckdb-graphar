@@ -420,9 +420,12 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
             gstate.storage_state = false;
             lstate.storage_state = false;
         }
-        lstate.cur_iter = gstate.MoveBaseReaders(lstate.cur_iter);
-
-        if (lstate.cur_iter != gstate.vertexes.end()) {
+        
+        std::lock_guard<std::mutex> lock(gstate.mtx);
+        while (lstate.cur_iter != gstate.vertexes.end() && num_rows == 0) {
+            lstate.cur_iter = gstate.MoveBaseReaders(lstate.cur_iter);
+            
+            DUCKDB_GRAPHAR_LOG_WARN("cur vertex: " + std::to_string(*lstate.cur_iter)); 
             num_rows = STANDARD_VECTOR_SIZE;
             for (auto& reader : lstate.readers) {
                 if (IsNullPtr(reader) || !num_rows) {
@@ -432,9 +435,9 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
                 idx_t reserve_rows = ReserveRowsToRead(reader);
                 num_rows = std::min(num_rows, reserve_rows);
             }
-        } else {
-            DUCKDB_GRAPHAR_LOG_DEBUG("final iter!!!");
+            DUCKDB_GRAPHAR_LOG_WARN("num rows reserved: " + std::to_string(num_rows));
         }
+        DUCKDB_GRAPHAR_LOG_WARN("AFTER move base reader")
     }
 
     DUCKDB_GRAPHAR_LOG_DEBUG("num rows final: " + std::to_string(num_rows));

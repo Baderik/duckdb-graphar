@@ -24,7 +24,6 @@ public:
         return (status == 0) ? res.get() : name;
     }
     auto MoveBaseReaders(std::vector<graphar::IdType>::iterator state_iter) {
-        std::lock_guard<std::mutex> lock(mtx);
         if (cur_iter == state_iter) {
             cur_iter++;
 
@@ -43,6 +42,10 @@ public:
 
                 auto& base_reader = base_readers[i];
                 FilterByRangeEdge(base_reader, {*cur_iter, *cur_iter + 1}, SRC_GID_COLUMN, edge_info, prefix);
+                std::visit([&](const auto& ptr) {
+                    DUCKDB_GRAPHAR_LOG_WARN("Base reader " + demangle(typeid(ptr).name()));
+                }, base_reader);
+                PrintFilterInfo(base_reader);
             }
         }
         return cur_iter;

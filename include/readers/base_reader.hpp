@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utils/func.hpp"
+#include "utils/global_log_manager.hpp"
 
 #include <graphar/arrow/chunk_reader.h>
 #include <graphar/chunk_info_reader.h>
@@ -131,6 +132,11 @@ public:
         filter_info->last_chunk_rows = (offset_pair.second - 1) % chunk_size + 1;
         filter_info->total_chunks = (offset_pair.second - 1) / chunk_size - offset_pair.first / chunk_size + 1;
         chunk_count = 0;
+    }
+
+    void PrintFilterInfo() {
+        using namespace duckdb;
+        DUCKDB_GRAPHAR_LOG_WARN("Filter info: offset rows: " + std::to_string(filter_info->offset_rows) + " last chunk rows: " + std::to_string(filter_info->last_chunk_rows) + " total chunks: " + std::to_string(filter_info->total_chunks));
     }
 
 private:
