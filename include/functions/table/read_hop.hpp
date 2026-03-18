@@ -34,7 +34,7 @@ public:
             const auto prefix = graph_info->GetPrefix();
             auto edge_info = *std::get_if<std::shared_ptr<graphar::EdgeInfo>>(&type_info);
 
-            DUCKDB_GRAPHAR_LOG_WARN("Before move readers");
+            DUCKDB_GRAPHAR_LOG_DEBUG("Before move readers");
             for (size_t i = 0; i < base_readers.size(); ++i) {
                 if (global_projected_inds[i].empty()) {
                     continue;
@@ -43,7 +43,7 @@ public:
                 auto& base_reader = base_readers[i];
                 FilterByRangeEdge(base_reader, {*cur_iter, *cur_iter + 1}, SRC_GID_COLUMN, edge_info, prefix);
                 std::visit([&](const auto& ptr) {
-                    DUCKDB_GRAPHAR_LOG_WARN("Base reader " + demangle(typeid(ptr).name()) + " for vertex " + std::to_string(*cur_iter));
+                    DUCKDB_GRAPHAR_LOG_DEBUG("Base reader " + demangle(typeid(ptr).name()) + " for vertex " + std::to_string(*cur_iter));
                 }, base_reader);
                 
                 PrintFilterInfo(base_reader);

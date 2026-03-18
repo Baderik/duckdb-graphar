@@ -349,7 +349,7 @@ unique_ptr<GlobalTableFunctionState> ReadHop::Init(ClientContext& context, Table
 //-------------------------------------------------------------------
 unique_ptr<LocalTableFunctionState> ReadHop::InitLocal(ExecutionContext& context, TableFunctionInitInput& input,
                                                        GlobalTableFunctionState* gstate_ptr) {
-    DUCKDB_GRAPHAR_LOG_WARN("ReadHop::InitLocal");
+    DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::InitLocal");
     auto bind_data = input.bind_data->Cast<ReadBindData>();
 
     auto lstate_ptr = make_uniq<ReadHopLocalTableFunctionState>();
@@ -425,7 +425,7 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
         while (lstate.cur_iter != gstate.vertexes.end() && num_rows == 0) {
             lstate.cur_iter = gstate.MoveBaseReaders(lstate.cur_iter);
             
-            DUCKDB_GRAPHAR_LOG_WARN("cur vertex: " + std::to_string(*lstate.cur_iter)); 
+            DUCKDB_GRAPHAR_LOG_DEBUG("cur vertex: " + std::to_string(*lstate.cur_iter)); 
             num_rows = STANDARD_VECTOR_SIZE;
             for (auto& reader : lstate.readers) {
                 if (IsNullPtr(reader) || !num_rows) {
@@ -433,12 +433,11 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
                 }
                 
                 idx_t reserve_rows = ReserveRowsToRead(reader);
-                DUCKDB_GRAPHAR_LOG_WARN("num rows reserved: " + std::to_string(reserve_rows));
+                DUCKDB_GRAPHAR_LOG_DEBUG("num rows reserved: " + std::to_string(reserve_rows));
                 num_rows = std::min(num_rows, reserve_rows);
             }
-            DUCKDB_GRAPHAR_LOG_WARN("num rows: " + std::to_string(num_rows));
+            DUCKDB_GRAPHAR_LOG_DEBUG("num rows: " + std::to_string(num_rows));
         }
-        DUCKDB_GRAPHAR_LOG_WARN("AFTER move base reader")
     }
 
     DUCKDB_GRAPHAR_LOG_DEBUG("num rows final: " + std::to_string(num_rows));

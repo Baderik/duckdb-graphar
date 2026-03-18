@@ -136,7 +136,7 @@ public:
 
     void PrintFilterInfo() {
         using namespace duckdb;
-        DUCKDB_GRAPHAR_LOG_WARN("Filter info: offset rows: " + std::to_string(filter_info->offset_rows) + " last chunk rows: " + std::to_string(filter_info->last_chunk_rows) + " total chunks: " + std::to_string(filter_info->total_chunks));
+        DUCKDB_GRAPHAR_LOG_DEBUG ("Filter info: offset rows: " + std::to_string(filter_info->offset_rows) + " last chunk rows: " + std::to_string(filter_info->last_chunk_rows) + " total chunks: " + std::to_string(filter_info->total_chunks));
     }
 
 private:
