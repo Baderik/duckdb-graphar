@@ -433,9 +433,10 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
                 }
                 
                 idx_t reserve_rows = ReserveRowsToRead(reader);
+                DUCKDB_GRAPHAR_LOG_WARN("num rows reserved: " + std::to_string(reserve_rows));
                 num_rows = std::min(num_rows, reserve_rows);
             }
-            DUCKDB_GRAPHAR_LOG_WARN("num rows reserved: " + std::to_string(num_rows));
+            DUCKDB_GRAPHAR_LOG_WARN("num rows: " + std::to_string(num_rows));
         }
         DUCKDB_GRAPHAR_LOG_WARN("AFTER move base reader")
     }

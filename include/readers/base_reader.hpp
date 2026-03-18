@@ -120,6 +120,7 @@ public:
         } else {
             reader->seek_dst(vid_range.first);
         }
+        chunk_count = 0;
         const auto chunk_size = edge_info->GetChunkSize();
         GAR_ASSIGN_OR_RAISE_ERROR(auto offset_pair, graphar::util::GetAdjListOffsetOfVertex(
                                                         edge_info, prefix, adj_list_type, vid_range.first));
@@ -131,7 +132,6 @@ public:
         filter_info->offset_rows = offset_pair.first % chunk_size;
         filter_info->last_chunk_rows = (offset_pair.second - 1) % chunk_size + 1;
         filter_info->total_chunks = (offset_pair.second - 1) / chunk_size - offset_pair.first / chunk_size + 1;
-        chunk_count = 0;
     }
 
     void PrintFilterInfo() {

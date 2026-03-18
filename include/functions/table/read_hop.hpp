@@ -43,8 +43,9 @@ public:
                 auto& base_reader = base_readers[i];
                 FilterByRangeEdge(base_reader, {*cur_iter, *cur_iter + 1}, SRC_GID_COLUMN, edge_info, prefix);
                 std::visit([&](const auto& ptr) {
-                    DUCKDB_GRAPHAR_LOG_WARN("Base reader " + demangle(typeid(ptr).name()));
+                    DUCKDB_GRAPHAR_LOG_WARN("Base reader " + demangle(typeid(ptr).name()) + " for vertex " + std::to_string(*cur_iter));
                 }, base_reader);
+                
                 PrintFilterInfo(base_reader);
             }
         }
