@@ -20,9 +20,17 @@ add_executable(unittest_graphar ${ALL_OBJECT_FILES})
 
 target_link_libraries(unittest_graphar
     PRIVATE
-        duckdb_graphar_extension       
-        Catch2::Catch2WithMain         
+        duckdb_static
+        duckdb_generated_extension_loader
+        core_functions_extension
+        parquet_extension
+        duckdb_graphar_extension
+        Catch2::Catch2WithMain
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(unittest_graphar PRIVATE jemalloc_extension)
+endif()
 
 target_include_directories(unittest_graphar PRIVATE
     ${DUCKDB_INCLUDES}

@@ -125,7 +125,7 @@ if(PATH_TO_LOCAL_GRAPHAR)
 else()
   list(APPEND EP_ARGS
     GIT_REPOSITORY https://github.com/lithium-tech/incubator-graphar.git
-    GIT_TAG        00423ca9bfd5ab96f47964ae9cf00dacd263fe95
+    GIT_TAG        2fc1fcf2faed6259a72fb47f14585a09cd162f32
   )
 endif()
 
@@ -186,7 +186,7 @@ set(DISABLE_VPTR_SANITIZER ON CACHE BOOL "")
 FetchContent_Declare(
     duckdb
     GIT_REPOSITORY https://github.com/duckdb/duckdb.git
-    GIT_TAG v1.4.3
+    GIT_TAG v1.5.0
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
 )

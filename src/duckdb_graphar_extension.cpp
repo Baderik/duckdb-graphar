@@ -9,12 +9,14 @@
 #include "functions/table/read_edges.hpp"
 #include "functions/table/read_vertices.hpp"
 #include "storage/graphar_storage.hpp"
+#include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
 
 #include <duckdb/common/exception.hpp>
 #include <duckdb/common/string_util.hpp>
 #include <duckdb/function/scalar_function.hpp>
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
+#include <duckdb/planner/extension_callback.hpp>
 
 #include <duckdb.hpp>
 
@@ -47,7 +49,10 @@ static void LoadInternal(ExtensionLoader& loader) {
     OneMoreHop::Register(loader);
     TwoHopThreads::Register(loader);
 
-    config.storage_extensions["duckdb_graphar"] = make_uniq<GraphArStorageExtension>();
+    StorageExtension::Register(config, "duckdb_graphar", make_shared_ptr<GraphArStorageExtension>());
+
+    auto callback = make_shared_ptr<S3CleanupCallback>();
+    ExtensionCallback::Register(loader.GetDatabaseInstance().config, callback);
 }
 
 void DuckdbGrapharExtension::Load(ExtensionLoader& loader) { LoadInternal(loader); }
