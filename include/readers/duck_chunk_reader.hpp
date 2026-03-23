@@ -57,32 +57,24 @@ public:
         : context(init_context), base(std::move(init_base)), file_reader(std::move(init_file_reader)) {}
 
     idx_t ReserveRowsToRead() {
-        // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead");
         if (cur_chunk && read_rows < cur_chunk->size()) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead cur_chunk && read_rows <
-            // cur_chunk->size()");
             return cur_chunk->size() - read_rows;
         }
         read_rows = 0;
         if (cur_result && (cur_chunk = cur_result->Fetch())) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead cur_result && (cur_chunk =
-            // cur_result->Fetch()): " + std::to_string(cur_chunk->size()));
             return cur_chunk->size();
         }
         auto gc_result = base->GetChunk();
         if (gc_result.no_more_chunks) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead no_more_chunks ");
             return 0;
         }
         auto maybe_path = gc_result.chunk;
         if (maybe_path.has_error()) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead maybe_path.has_error()");
             throw maybe_path.error();
         }
         auto path = maybe_path.value();
         cur_result = file_reader->ReadFileToTable(path, proj_columns, gc_result.rows_range);
         cur_chunk = cur_result->Fetch();
-        // DUCKDB_GRAPHAR_LOG_DEBUG("BaseDuckChunkReader::ReserveRowsToRead cur_chunk size");
         return cur_chunk->size();
     }
 

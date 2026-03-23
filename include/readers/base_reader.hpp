@@ -2,6 +2,7 @@
 
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
+#include "readers/query_reader.hpp"
 
 #include <graphar/arrow/chunk_reader.h>
 #include <graphar/chunk_info_reader.h>
@@ -35,6 +36,9 @@ template <typename T>
 concept IsEdgeReader =
     std::is_same_v<T, AdjListArrowChunkReader> || std::is_same_v<T, AdjListPropertyArrowChunkReader> ||
     std::is_same_v<T, AdjListChunkInfoReader> || std::is_same_v<T, AdjListPropertyChunkInfoReader>;
+
+template <typename T>
+concept IsQueryReader = std::is_same_v<T, duckdb::QueryChunkReader>;
 
 template <typename StoredReader>
 class ThreadSafeReader {
@@ -93,11 +97,11 @@ public:
             return;
         }
         GAR_RAISE_ERROR_NOT_OK(reader->seek(vid_range.first));
+        chunk_count = 0;
         const auto chunk_size = vertex_info->GetChunkSize();
         filter_info->offset_rows = vid_range.first % chunk_size;
         filter_info->last_chunk_rows = (vid_range.second - 1) % chunk_size + 1;
         filter_info->total_chunks = (vid_range.second - 1) / chunk_size - vid_range.first / chunk_size + 1;
-        chunk_count = 0;
     }
 
     void FilterByRangeEdge(const std::pair<int64_t, int64_t>& vid_range, const std::string& filter_column,
@@ -134,9 +138,20 @@ public:
         filter_info->total_chunks = (offset_pair.second - 1) / chunk_size - offset_pair.first / chunk_size + 1;
     }
 
+    template <typename... Args>
+    void callQuery(const std::string &query, Args&&... args)
+    requires IsQueryReader<StoredReader> 
+    {
+        reader->callQuery(query, std::forward<Args>(args)...);
+    }
+
     void PrintFilterInfo() {
         using namespace duckdb;
-        DUCKDB_GRAPHAR_LOG_DEBUG ("Filter info: offset rows: " + std::to_string(filter_info->offset_rows) + " last chunk rows: " + std::to_string(filter_info->last_chunk_rows) + " total chunks: " + std::to_string(filter_info->total_chunks));
+        if (filter_info) {
+            DUCKDB_GRAPHAR_LOG_DEBUG ("Filter info: offset rows: " + std::to_string(filter_info->offset_rows) + " last chunk rows: " + std::to_string(filter_info->last_chunk_rows) + " total chunks: " + std::to_string(filter_info->total_chunks));
+        } else {
+           DUCKDB_GRAPHAR_LOG_DEBUG ("Filter info: empty"); 
+        }
     }
 
 private:
@@ -153,5 +168,6 @@ using TSAdjListPropertyArrowChunkReader = ThreadSafeReader<AdjListPropertyArrowC
 using TSVertexPropertyChunkInfoReader = ThreadSafeReader<VertexPropertyChunkInfoReader>;
 using TSAdjListChunkInfoReader = ThreadSafeReader<AdjListChunkInfoReader>;
 using TSAdjListPropertyChunkInfoReader = ThreadSafeReader<AdjListPropertyChunkInfoReader>;
+using TSQueryChunkReader = ThreadSafeReader<duckdb::QueryChunkReader>;
 
-}  // namespace graphar
+}// namespace graphar

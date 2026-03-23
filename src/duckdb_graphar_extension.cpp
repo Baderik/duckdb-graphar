@@ -8,6 +8,7 @@
 #include "functions/table/hop_thread.hpp"
 #include "functions/table/read_edges.hpp"
 #include "functions/table/read_hop.hpp"
+#include "functions/table/read_hop_filtered.hpp"
 #include "functions/table/read_vertices.hpp"
 #include "storage/graphar_storage.hpp"
 #include "utils/global_log_manager.hpp"
@@ -48,6 +49,7 @@ static void LoadInternal(ExtensionLoader& loader) {
     OneMoreHop::Register(loader);
     TwoHopThreads::Register(loader);
     ReadHop::Register(loader);
+    ReadHopFiltered::Register(loader);
 
     config.storage_extensions["duckdb_graphar"] = make_uniq<GraphArStorageExtension>();
 }

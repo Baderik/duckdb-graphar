@@ -3,6 +3,7 @@
 #include "readers/base_reader.hpp"
 #include "readers/duck_arrow_chunk_reader.hpp"
 #include "readers/duck_chunk_reader.hpp"
+#include "readers/duck_query_reader.hpp"
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
@@ -34,13 +35,15 @@ using BaseReaderPtr = std::variant<
     std::shared_ptr<graphar::TSVertexPropertyChunkInfoReader>, std::shared_ptr<graphar::TSAdjListChunkInfoReader>,
     std::shared_ptr<graphar::TSAdjListPropertyChunkInfoReader>,
     std::shared_ptr<graphar::TSVertexPropertyArrowChunkReader>, std::shared_ptr<graphar::TSAdjListArrowChunkReader>,
-    std::shared_ptr<graphar::TSAdjListPropertyArrowChunkReader>>;
+    std::shared_ptr<graphar::TSAdjListPropertyArrowChunkReader>,
+    std::shared_ptr<graphar::TSQueryChunkReader>>;
 
 using ReaderPtr = std::variant<
     std::shared_ptr<graphar::DuckVertexPropertyArrowChunkReader>, std::shared_ptr<graphar::DuckAdjListArrowChunkReader>,
     std::shared_ptr<graphar::DuckAdjListPropertyArrowChunkReader>,
     std::shared_ptr<graphar::DuckVertexPropertyChunkReader>, std::shared_ptr<graphar::DuckAdjListChunkReader>,
-    std::shared_ptr<graphar::DuckAdjListPropertyChunkReader>>;
+    std::shared_ptr<graphar::DuckAdjListPropertyChunkReader>,
+    std::shared_ptr<graphar::DuckQueryChunkReader>>;
 
 template <typename SomeReader>
 BaseReaderPtr ConvertBaseReader(graphar::Result<std::shared_ptr<SomeReader>> maybe_reader) {
@@ -133,7 +136,9 @@ class ReadBase;
 class ReadVertices;
 class ReadEdges;
 class ReadHop;
+class ReadHopFiltered;
 class ReadHopGlobalTableFunctionState;
+class ReadHopFilteredGlobalTableFunctionState;
 
 class ReadBindData : public TableFunctionData {
 public:
@@ -165,6 +170,7 @@ private:
     friend class ReadVertices;
     friend class ReadEdges;
     friend class ReadHop;
+    friend class ReadHopFiltered;
 };
 
 class ReadBaseGlobalTableFunctionState : public GlobalTableFunctionState {
@@ -198,6 +204,8 @@ private:
     friend class ReadEdges;
     friend class ReadHop;
     friend class ReadHopGlobalTableFunctionState;
+    friend class ReadHopFiltered;
+    friend class ReadHopFilteredGlobalTableFunctionState;
 };
 
 class ReadBaseLocalTableFunctionState : public LocalTableFunctionState {
@@ -211,6 +219,7 @@ private:
     friend class ReadVertices;
     friend class ReadEdges;
     friend class ReadHop;
+    friend class ReadHopFiltered;
 };
 
 template <typename ReadFinal>
