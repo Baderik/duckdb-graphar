@@ -8,6 +8,7 @@ EXT_CONFIG=${PROJ_DIR}extension_config.cmake
 THIRD_PARTY_DIR=$(PROJ_DIR)third_party
 THIRD_PARTY_CMAKE=$(PROJ_DIR)third_party/extension_deps.cmake
 
+ARROW_REP=https://github.com/apache/arrow.git
 ARROW_VERSION=19.0.1
 ARROW_DIR=$(THIRD_PARTY_DIR)/arrow
 ARROW_INSTALL_DIR=$(ARROW_DIR)/install
@@ -17,6 +18,8 @@ ARROW_CLONED = $(ARROW_DIR)/.cloned
 ARROW_BUILT = $(ARROW_DIR)/.built
 ARROW_INSTALLED = $(ARROW_DIR)/.installed
 
+GRAPHAR_REP=https://github.com/lithium-tech/incubator-graphar.git
+GRAPHAR_COMMIT=2fc1fcf2faed6259a72fb47f14585a09cd162f32
 GRAPHAR_DIR=$(THIRD_PARTY_DIR)/graphar
 GRAPHAR_INSTALL_DIR=$(GRAPHAR_DIR)/install
 GRAPHAR_SRC_DIR=$(GRAPHAR_DIR)/src
@@ -34,7 +37,7 @@ include extension-ci-tools/makefiles/duckdb_extension.Makefile
 $(ARROW_CLONED):
 	@echo "Clone Apache Arrow"
 	rm -rf $(ARROW_SRC_DIR)
-	git clone --branch apache-arrow-$(ARROW_VERSION) https://github.com/apache/arrow.git $(ARROW_SRC_DIR)
+	git clone --branch apache-arrow-$(ARROW_VERSION) ${ARROW_REP} $(ARROW_SRC_DIR)
 	@touch $(ARROW_CLONED)
 
 $(ARROW_BUILT): $(ARROW_CLONED)
@@ -83,7 +86,8 @@ $(GRAPHAR_CLONED): $(ARROW_INSTALLED)
 	@echo "Clone Apache GraphAr"
 	rm -rf $(GRAPHAR_DIR)
 	mkdir -p $(GRAPHAR_DIR)
-	git clone https://github.com/apache/incubator-graphar.git $(GRAPHAR_SRC_DIR)
+	git clone $(GRAPHAR_REP) $(GRAPHAR_SRC_DIR)
+	git -C $(GRAPHAR_SRC_DIR) checkout $(GRAPHAR_COMMIT)
 	@touch $(GRAPHAR_CLONED)
 
 $(GRAPHAR_BUILT): $(GRAPHAR_CLONED)
