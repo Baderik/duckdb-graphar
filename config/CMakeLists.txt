@@ -4,12 +4,15 @@
 
 file(GLOB_RECURSE EXTENSION_SOURCES CONFIGURE_DEPENDS "${EXTENSION_ROOT_DIR}/src/*.cpp")
 
+set(PARAMETERS "-warnings")
+set(EXTENSION_STATIC_BUILD ON CACHE BOOL "Build extensions with static DuckDB")
+
 log_stage("Building static extension")
 build_static_extension(duckdb_graphar ${EXTENSION_SOURCES})
 log_done()
 
 log_stage("Building loadable extension")
-build_loadable_extension(duckdb_graphar ${EXTENSION_SOURCES})
+build_loadable_extension(duckdb_graphar ${PARAMETERS} ${EXTENSION_SOURCES})
 log_done()
 
 set(DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/_deps)
