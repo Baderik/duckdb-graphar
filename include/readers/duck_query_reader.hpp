@@ -32,7 +32,7 @@ public:
     idx_t ReserveRowsToRead() {
         if (NoMoreRows()) {
             auto gc_result = base->GetChunk();
-            if (gc_result.no_more_chunks) {
+            if (gc_result.no_more_chunks || gc_result.chunk == nullptr) {
                 return 0;
             }
             cur_chunk = std::move(gc_result.chunk);
