@@ -16,6 +16,13 @@
 
 namespace duckdb {
 
+class ReadHopBindData : public ReadBindData {
+private:
+    std::vector<int64_t> vids;
+
+    friend class ReadHop; 
+};
+
 class ReadHopGlobalTableFunctionState : public ReadBaseGlobalTableFunctionState {
 public:
     static std::string demangle(const char* name) {
@@ -29,6 +36,10 @@ public:
 
             if (cur_iter == vertexes.end()) {
                 return cur_iter;
+            }
+
+            if (cur_iter == next_hop_iter) {
+                storage_state = false;
             }
 
             const auto prefix = graph_info->GetPrefix();
@@ -58,6 +69,7 @@ private:
     std::vector<graphar::IdType> vertexes;
     std::unordered_set<graphar::IdType> _vertexes;
     std::vector<graphar::IdType>::iterator cur_iter = vertexes.begin();
+    std::vector<graphar::IdType>::iterator next_hop_iter = vertexes.end();
 
     std::mutex mtx;
     bool storage_state = true;
@@ -75,7 +87,7 @@ private:
 class ReadHop : public ReadBase<ReadHop> {
 public:
     static void SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info,
-                            std::shared_ptr<graphar::EdgeInfo> edge_info, unique_ptr<ReadBindData>& bind_data);
+                            std::shared_ptr<graphar::EdgeInfo> edge_info, unique_ptr<ReadHopBindData>& bind_data);
     static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
                                          vector<LogicalType>& return_types, vector<string>& names);
 

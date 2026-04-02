@@ -37,7 +37,6 @@ void ReadHopFiltered::SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info
             bind_data.reset(derived);
         }
     }
-
 }
 //-------------------------------------------------------------------
 // Bind
@@ -51,18 +50,44 @@ unique_ptr<FunctionData> ReadHopFiltered::Bind(ClientContext& context, TableFunc
     const std::string dst_type = StringValue::Get(input.named_parameters.at("dst"));
     const std::string e_type = StringValue::Get(input.named_parameters.at("type"));
 
-    const int64_t vid = IntegerValue::Get(input.named_parameters.at("vid"));
+    duckdb::vector<duckdb::Value> duck_vids;
+    auto vids_entry = input.named_parameters.find("vids");  
+    if (vids_entry == input.named_parameters.end()) {  
+        auto vid_entry = input.named_parameters.find("vid");  
+        if (vid_entry != input.named_parameters.end() && !vid_entry->second.IsNull()) {  
+            duck_vids = {vid_entry->second};
+        } else {
+            throw BinderException("Expecting a named parameter vids or vid");
+        }
+    } else {
+        duck_vids = ListValue::GetChildren(vids_entry->second);
+        if (duck_vids.empty()) {
+            throw BinderException("Expecting non empty vids");
+        }
+    }
+
+    auto bind_data = make_uniq<ReadHopFilteredBindData>();
+    bind_data->vids.resize(duck_vids.size());
+    
+    std::string _vids_str = "";
+    for (size_t i = 0; i < duck_vids.size(); ++i) {
+        bind_data->vids[i] = IntegerValue::Get(duck_vids[i]);
+        if (!_vids_str.empty()) {
+            _vids_str += ',';
+        }
+        _vids_str += std::to_string(bind_data->vids[i]);
+    }
+    const int64_t vid = bind_data->vids[0];
 
     std::string filter_string;
     if (input.named_parameters.contains("filter")) {
         filter_string = StringValue::Get(input.named_parameters.at("filter"));
     } 
 
-    DUCKDB_GRAPHAR_LOG_DEBUG(src_type + "(" + std::to_string(vid) + ")--" +
+    DUCKDB_GRAPHAR_LOG_DEBUG(src_type + "(" + _vids_str + ")--" +
                              e_type + (filter_string != "" ? "WHERE " + filter_string : "") + "->" +
                              dst_type + "\nLoad Graph Info and Edge Info");
 
-    auto bind_data = make_uniq<ReadHopFilteredBindData>();
     DUCKDB_GRAPHAR_LOG_DEBUG("file path " + file_path);
     auto maybe_graph_info = graphar::GraphInfo::Load(file_path);
     if (maybe_graph_info.has_error()) {
@@ -172,7 +197,7 @@ void ReadHopFiltered::PushdownComplexFilter(ClientContext& context, LogicalGet& 
         filt += filter->ToString();
     }
     read_bind_data->query_filter = filt;
-    DUCKDB_GRAPHAR_LOG_WARN("filters<" + std::to_string(filters.size()) + ">:" + filt);
+    DUCKDB_GRAPHAR_LOG_DEBUG("filters<" + std::to_string(filters.size()) + ">:" + filt);
     
     vector<unique_ptr<Expression>> filters_new;
     filters = std::move(filters_new);
@@ -188,6 +213,7 @@ TableFunction ReadHopFiltered::GetFunction() {
     read_hop.named_parameters["src"] = LogicalType::VARCHAR;
     read_hop.named_parameters["dst"] = LogicalType::VARCHAR;
     read_hop.named_parameters["type"] = LogicalType::VARCHAR;
+    read_hop.named_parameters["vids"] = LogicalType::LIST(LogicalType::INTEGER);
     read_hop.named_parameters["vid"] = LogicalType::INTEGER;
 
     read_hop.filter_pushdown = false;
@@ -285,9 +311,15 @@ unique_ptr<GlobalTableFunctionState> ReadHopFiltered::Init(ClientContext& contex
                                                 graphar::AdjListType::ordered_by_source, bind_data.vid_range.first)
             .value();
 
-    gstate.vertexes.reserve(offset_pair.second - offset_pair.first + 1);
-    gstate.vertexes.push_back(bind_data.vid_range.first);
+    gstate.vertexes.reserve((offset_pair.second - offset_pair.first + 1) * bind_data.vids.size());
+    gstate._vertexes.reserve((offset_pair.second - offset_pair.first + 1) * bind_data.vids.size());
+    for (const auto& vid : bind_data.vids) {
+        gstate.vertexes.push_back(vid);
+        gstate._vertexes.insert(vid);
+    }
+    
     gstate.cur_iter = gstate.vertexes.begin();
+    gstate.next_hop_iter = gstate.vertexes.end();
 
     const auto prop_types_size = bind_data.prop_types.size();
     vector<idx_t> columns_pref_num(prop_types_size + 1);
@@ -401,7 +433,6 @@ unique_ptr<LocalTableFunctionState> ReadHopFiltered::InitLocal(ExecutionContext&
 
     return lstate_ptr;
 }
-
 //-------------------------------------------------------------------
 // Execute
 //-------------------------------------------------------------------
@@ -443,11 +474,6 @@ void ReadHopFiltered::Execute(ClientContext& context, TableFunctionInput& input,
     DUCKDB_GRAPHAR_LOG_DEBUG("num rows pred: " + std::to_string(num_rows));
 
     if (num_rows == 0) {
-        if (lstate.storage_state) {
-            gstate.storage_state = false;
-            lstate.storage_state = false;
-        }
-        
         std::lock_guard<std::mutex> lock(gstate.mtx);
         while (lstate.cur_iter != gstate.vertexes.end() && num_rows == 0) {
             lstate.cur_iter = gstate.MoveBaseReaders(lstate.cur_iter);
@@ -465,11 +491,10 @@ void ReadHopFiltered::Execute(ClientContext& context, TableFunctionInput& input,
             }
             DUCKDB_GRAPHAR_LOG_DEBUG("num rows: " + std::to_string(num_rows));
         }
+        lstate.storage_state = gstate.storage_state;
     }
 
     DUCKDB_GRAPHAR_LOG_DEBUG("num rows final: " + std::to_string(num_rows));
-
-    // num_rows = 0;
 
     if (num_rows > 0) {
         for (idx_t i = 0; i < lstate.readers.size(); i++) {

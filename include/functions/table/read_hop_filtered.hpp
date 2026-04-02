@@ -21,6 +21,7 @@ class ReadHopFilteredBindData : public ReadBindData {
 private:
     std::string query_filter;
     std::string graph_info_path;
+    std::vector<int64_t> vids;
 
     friend class ReadHopFiltered; 
 };
@@ -38,6 +39,10 @@ public:
 
             if (cur_iter == vertexes.end()) {
                 return cur_iter;
+            }
+
+            if (cur_iter == next_hop_iter) {
+                storage_state = false;
             }
 
             const auto prefix = graph_info->GetPrefix();
@@ -86,6 +91,7 @@ private:
     std::vector<graphar::IdType> vertexes;
     std::unordered_set<graphar::IdType> _vertexes;
     std::vector<graphar::IdType>::iterator cur_iter = vertexes.begin();
+    std::vector<graphar::IdType>::iterator next_hop_iter = vertexes.end();
 
     std::mutex mtx;
     bool storage_state = true;
