@@ -15,8 +15,8 @@ public:
     DuckQueryChunkReader(std::shared_ptr<graphar::TSQueryChunkReader> init_base, ClientContext& init_context)
         : base(std::move(init_base)), context(init_context) {}
 
-    static graphar::Result<std::shared_ptr<DuckQueryChunkReader>> Make(ClientContext& context,
-                                                                       std::shared_ptr<graphar::TSQueryChunkReader> base_ptr) {
+    static graphar::Result<std::shared_ptr<DuckQueryChunkReader>> Make(
+        ClientContext& context, std::shared_ptr<graphar::TSQueryChunkReader> base_ptr) {
         if (!base_ptr) {
             return graphar::Status::Invalid("base_ptr can't be null!");
         }

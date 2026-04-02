@@ -2,7 +2,6 @@
 
 #include "functions/table/read_base.hpp"
 
-
 #include <duckdb/common/named_parameter_map.hpp>
 #include <duckdb/function/table/arrow/arrow_duck_schema.hpp>
 #include <duckdb/function/table_function.hpp>
@@ -23,7 +22,7 @@ private:
     std::string graph_info_path;
     std::vector<int64_t> vids;
 
-    friend class ReadHopFiltered; 
+    friend class ReadHopFiltered;
 };
 
 class ReadHopFilteredGlobalTableFunctionState : public ReadBaseGlobalTableFunctionState {
@@ -55,13 +54,15 @@ public:
                 }
 
                 auto& base_reader = base_readers[i];
-                std::visit([&](auto& r) {
-                    if constexpr (requires { r->callQuery(query_string, *cur_iter); }) {
-                        r->callQuery(query_string, *cur_iter);
-                    } else {
-                        throw InternalException("callQuery not implemented for this reader");
-                    }
-                }, base_reader);
+                std::visit(
+                    [&](auto& r) {
+                        if constexpr (requires { r->callQuery(query_string, *cur_iter); }) {
+                            r->callQuery(query_string, *cur_iter);
+                        } else {
+                            throw InternalException("callQuery not implemented for this reader");
+                        }
+                    },
+                    base_reader);
             }
         }
         return cur_iter;
@@ -70,19 +71,18 @@ public:
     void GenerateQuery() {
         auto edge_info = *std::get_if<std::shared_ptr<graphar::EdgeInfo>>(&type_info);
         std::string columns = "";
-        for (auto &col_id : column_ids) {
+        for (auto& col_id : column_ids) {
             if (!columns.empty()) {
                 columns += ", ";
             }
             columns += "#" + std::to_string(col_id + 1);
         }
-        query_string = "SELECT " + columns + " FROM read_edges('" + graph_info_path + 
-                       "', src='" + edge_info->GetSrcType() + 
-                       "', type='" + edge_info->GetEdgeType() + 
-                       "', dst='" + edge_info->GetDstType() + "') WHERE _graphArSrcIndex = $1";
+        query_string = "SELECT " + columns + " FROM read_edges('" + graph_info_path + "', src='" +
+                       edge_info->GetSrcType() + "', type='" + edge_info->GetEdgeType() + "', dst='" +
+                       edge_info->GetDstType() + "') WHERE _graphArSrcIndex = $1";
 
         if (!query_filter.empty()) {
-            query_string += " AND " + query_filter; 
+            query_string += " AND " + query_filter;
         }
         DUCKDB_GRAPHAR_LOG_DEBUG(query_string);
     }
@@ -113,12 +113,13 @@ private:
 class ReadHopFiltered : public ReadBase<ReadHopFiltered> {
 public:
     static void SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info,
-                            std::shared_ptr<graphar::EdgeInfo> edge_info, unique_ptr<ReadHopFilteredBindData>& bind_data);
+                            std::shared_ptr<graphar::EdgeInfo> edge_info,
+                            unique_ptr<ReadHopFilteredBindData>& bind_data);
     static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
                                          vector<LogicalType>& return_types, vector<string>& names);
 
-    static BaseReaderPtr GetBaseReader(ClientContext& context, ReadHopFilteredGlobalTableFunctionState& gstate, idx_t ind,
-                                       const std::string& filter_column);
+    static BaseReaderPtr GetBaseReader(ClientContext& context, ReadHopFilteredGlobalTableFunctionState& gstate,
+                                       idx_t ind, const std::string& filter_column);
     static void SetFilter(ClientContext& context, ReadBaseGlobalTableFunctionState& gstate, idx_t ind,
                           const std::pair<int64_t, int64_t>& vid_range, const std::string& filter_column);
     static ReaderPtr GetReader(ClientContext& context, ReadBaseGlobalTableFunctionState& gstate,

@@ -1,8 +1,8 @@
 #pragma once
 
+#include "readers/query_reader.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
-#include "readers/query_reader.hpp"
 
 #include <graphar/arrow/chunk_reader.h>
 #include <graphar/chunk_info_reader.h>
@@ -139,8 +139,8 @@ public:
     }
 
     template <typename... Args>
-    void callQuery(const std::string &query, Args&&... args)
-    requires IsQueryReader<StoredReader> 
+    void callQuery(const std::string& query, Args&&... args)
+    requires IsQueryReader<StoredReader>
     {
         reader->callQuery(query, std::forward<Args>(args)...);
     }
@@ -148,9 +148,11 @@ public:
     void PrintFilterInfo() {
         using namespace duckdb;
         if (filter_info) {
-            DUCKDB_GRAPHAR_LOG_DEBUG ("Filter info: offset rows: " + std::to_string(filter_info->offset_rows) + " last chunk rows: " + std::to_string(filter_info->last_chunk_rows) + " total chunks: " + std::to_string(filter_info->total_chunks));
+            DUCKDB_GRAPHAR_LOG_DEBUG("Filter info: offset rows: " + std::to_string(filter_info->offset_rows) +
+                                     " last chunk rows: " + std::to_string(filter_info->last_chunk_rows) +
+                                     " total chunks: " + std::to_string(filter_info->total_chunks));
         } else {
-           DUCKDB_GRAPHAR_LOG_DEBUG ("Filter info: empty"); 
+            DUCKDB_GRAPHAR_LOG_DEBUG("Filter info: empty");
         }
     }
 
@@ -170,4 +172,4 @@ using TSAdjListChunkInfoReader = ThreadSafeReader<AdjListChunkInfoReader>;
 using TSAdjListPropertyChunkInfoReader = ThreadSafeReader<AdjListPropertyChunkInfoReader>;
 using TSQueryChunkReader = ThreadSafeReader<duckdb::QueryChunkReader>;
 
-}// namespace graphar
+}  // namespace graphar

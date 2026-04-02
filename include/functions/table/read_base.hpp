@@ -35,15 +35,13 @@ using BaseReaderPtr = std::variant<
     std::shared_ptr<graphar::TSVertexPropertyChunkInfoReader>, std::shared_ptr<graphar::TSAdjListChunkInfoReader>,
     std::shared_ptr<graphar::TSAdjListPropertyChunkInfoReader>,
     std::shared_ptr<graphar::TSVertexPropertyArrowChunkReader>, std::shared_ptr<graphar::TSAdjListArrowChunkReader>,
-    std::shared_ptr<graphar::TSAdjListPropertyArrowChunkReader>,
-    std::shared_ptr<graphar::TSQueryChunkReader>>;
+    std::shared_ptr<graphar::TSAdjListPropertyArrowChunkReader>, std::shared_ptr<graphar::TSQueryChunkReader>>;
 
 using ReaderPtr = std::variant<
     std::shared_ptr<graphar::DuckVertexPropertyArrowChunkReader>, std::shared_ptr<graphar::DuckAdjListArrowChunkReader>,
     std::shared_ptr<graphar::DuckAdjListPropertyArrowChunkReader>,
     std::shared_ptr<graphar::DuckVertexPropertyChunkReader>, std::shared_ptr<graphar::DuckAdjListChunkReader>,
-    std::shared_ptr<graphar::DuckAdjListPropertyChunkReader>,
-    std::shared_ptr<graphar::DuckQueryChunkReader>>;
+    std::shared_ptr<graphar::DuckAdjListPropertyChunkReader>, std::shared_ptr<graphar::DuckQueryChunkReader>>;
 
 template <typename SomeReader>
 BaseReaderPtr ConvertBaseReader(graphar::Result<std::shared_ptr<SomeReader>> maybe_reader) {

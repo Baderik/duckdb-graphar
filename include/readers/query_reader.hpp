@@ -10,8 +10,8 @@ class QueryChunkReader {
 public:
     explicit QueryChunkReader(std::shared_ptr<Connection> conn) : conn(std::move(conn)) {}
 
-	template <bool Stream = false, typename... Args>
-    void callQuery(const std::string &query, Args&&... args) {
+    template <bool Stream = false, typename... Args>
+    void callQuery(const std::string& query, Args&&... args) {
         if constexpr (Stream) {
             result = conn->SendQuery(query);
         } else {
@@ -33,7 +33,8 @@ public:
         return cur_chunk;
     }
 
-    static graphar::Result<std::shared_ptr<QueryChunkReader>> Make(std::shared_ptr<Connection> conn, std::string &query_string, graphar::IdType vid) {
+    static graphar::Result<std::shared_ptr<QueryChunkReader>> Make(std::shared_ptr<Connection> conn,
+                                                                   std::string& query_string, graphar::IdType vid) {
         auto reader = std::make_shared<QueryChunkReader>(std::move(conn));
         reader->callQuery(query_string, vid);
         return reader;
@@ -45,4 +46,4 @@ private:
     duckdb::unique_ptr<duckdb::DataChunk> chunk;
 };
 
-} // namespace duckdb
+}  // namespace duckdb
