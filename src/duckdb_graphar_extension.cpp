@@ -41,7 +41,7 @@ static void LoadInternal(ExtensionLoader& loader) {
     config.AddExtensionOption("graphar_time_logging", "Enable time logging for GraphAr requests.", LogicalType::BOOLEAN,
                               Value::BOOLEAN(false));
 
-    GlobalLogManager::Initialize(loader.GetDatabaseInstance(), duckdb::LogLevel::LOG_WARN);
+    GlobalLogManager::Initialize(loader.GetDatabaseInstance(), duckdb::LogLevel::LOG_WARNING);
 
     ReadVertices::Register(loader);
     ReadEdges::Register(loader);

@@ -76,7 +76,7 @@ unique_ptr<FunctionData> ReadHop::Bind(ClientContext& context, TableFunctionBind
 
     DUCKDB_GRAPHAR_LOG_DEBUG("Fill bind data");
 
-    const std::string prefix = GetDirectory(edge_info_path);
+    const std::string prefix = graphar::PathToDirectory(edge_info_path);
 
     const auto graph_info = std::make_shared<graphar::GraphInfo>(
         "", graphar::VertexInfoVector(), graphar::EdgeInfoVector(), std::vector<std::string>(), prefix);

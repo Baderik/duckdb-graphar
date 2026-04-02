@@ -26,6 +26,6 @@ private:
 #define DUCKDB_GRAPHAR_LOG_TRACE(msg) DUCKDB_LOG_TRACE(GlobalLogManager::GetLogManager().GlobalLoggerReference(), msg)
 #define DUCKDB_GRAPHAR_LOG_DEBUG(msg) DUCKDB_LOG_DEBUG(GlobalLogManager::GetLogManager().GlobalLoggerReference(), msg)
 #define DUCKDB_GRAPHAR_LOG_INFO(msg) DUCKDB_LOG_INFO(GlobalLogManager::GetLogManager().GlobalLoggerReference(), msg)
-#define DUCKDB_GRAPHAR_LOG_WARN(msg) DUCKDB_LOG_WARN(GlobalLogManager::GetLogManager().GlobalLoggerReference(), msg)
+#define DUCKDB_GRAPHAR_LOG_WARN(msg) DUCKDB_LOG_WARNING(GlobalLogManager::GetLogManager().GlobalLoggerReference(), msg)
 #define DUCKDB_GRAPHAR_LOG_ERROR(msg) DUCKDB_LOG_ERROR(GlobalLogManager::GetLogManager().GlobalLoggerReference(), msg)
 #define DUCKDB_GRAPHAR_LOG_FATAL(msg) DUCKDB_LOG_FATAL(GlobalLogManager::GetLogManager().GlobalLoggerReference(), msg)
