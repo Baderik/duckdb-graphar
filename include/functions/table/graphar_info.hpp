@@ -1,7 +1,7 @@
 #pragma once
 
-
 #include <duckdb/function/table_function.hpp>
+
 #include <duckdb.hpp>
 
 namespace duckdb {

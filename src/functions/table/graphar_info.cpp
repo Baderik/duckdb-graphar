@@ -1,14 +1,15 @@
 #include "functions/table/graphar_info.hpp"
-#include "duckdb/main/database.hpp"
+
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/common/types/timestamp.hpp"
+#include "duckdb/main/database.hpp"
 
 #include <cstdint>
 
 namespace duckdb {
 
 unique_ptr<FunctionData> GraphArInfo::Bind(ClientContext& context, TableFunctionBindInput& input,
-                                              vector<LogicalType>& return_types, vector<string>& names) {
+                                           vector<LogicalType>& return_types, vector<string>& names) {
     names.emplace_back("extension_commit");
     return_types.emplace_back(LogicalType::VARCHAR);
     names.emplace_back("build_timestamp");
@@ -43,8 +44,7 @@ void GraphArInfo::Execute(ClientContext& context, TableFunctionInput& data_p, Da
 }
 
 TableFunctionSet GraphArInfo::GetFunctions() {
-    TableFunction information_f = TableFunction("graphar_info", {}, 
-                                                GraphArInfo::Execute, GraphArInfo::Bind, GraphArInfo::Init);
+    TableFunction information_f = TableFunction("graphar_info", {}, Execute, Bind, Init);
     return TableFunctionSet(information_f);
 }
 
