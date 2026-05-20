@@ -43,6 +43,36 @@ endfunction()
 # =============================================
 # Dependency Management
 # =============================================
+# Get git commit hash for this extension
+find_package(Git)
+if(Git_FOUND)
+    # Get extension git commit hash
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} log -1 --format=%h
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE EXTENSION_GIT_COMMIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE EXTENSION_GIT_RESULT
+    )
+    if(EXTENSION_GIT_RESULT)
+        set(EXTENSION_GIT_COMMIT_HASH "unknown")
+    endif()
+else()
+    set(EXTENSION_GIT_COMMIT_HASH "unknown")
+endif()
+
+# Get build timestamp
+string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d %H:%M:%S%z")
+
+# Add compile definitions for version information
+add_definitions(-DEXTENSION_GIT_COMMIT_HASH="${EXTENSION_GIT_COMMIT_HASH}")
+add_definitions(-DEXTENSION_BUILD_TIMESTAMP="${BUILD_TIMESTAMP}")
+
+# Print version information during configuration
+message(STATUS "Extension Git Commit: ${EXTENSION_GIT_COMMIT_HASH}")
+message(STATUS "Build Timestamp: ${BUILD_TIMESTAMP}")
+
 set(DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/_deps)
 set(ARROW_INSTALL_DIR ${DEPS_INSTALL_DIR}/arrow-install)
 set(GRAPHAR_INSTALL_DIR ${DEPS_INSTALL_DIR}/graphar-install)
