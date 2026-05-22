@@ -21,38 +21,33 @@
 namespace duckdb {
 
 LogicalTypeId GraphArFunctions::graphArT2duckT(const std::string& name) {
+    if (name == "bool") return LogicalTypeId::BOOLEAN;
     if (name == "int32") return LogicalTypeId::INTEGER;
     if (name == "int64") return LogicalTypeId::BIGINT;
-    if (name == "string") return LogicalTypeId::VARCHAR;
     if (name == "float") return LogicalTypeId::FLOAT;
     if (name == "double") return LogicalTypeId::DOUBLE;
-    if (name == "bool") return LogicalTypeId::BOOLEAN;
+    if (name == "string") return LogicalTypeId::VARCHAR;
     if (name == "date") return LogicalTypeId::DATE;
+    if (name == "timestamp") return LogicalTypeId::TIMESTAMP;
 
-    throw NotImplementedException("Unsupported type: " + name);
+    throw NotImplementedException("Unsupported type for conversion to duck: " + name);
 }
 
 std::shared_ptr<arrow::DataType> GraphArFunctions::graphArT2arrowT(const std::string& name) {
+    if (name == "bool") return arrow::boolean();
     if (name == "int32") return arrow::int32();
     if (name == "int64") return arrow::int64();
-    if (name == "string") return arrow::utf8();
     if (name == "float") return arrow::float32();
     if (name == "double") return arrow::float64();
-    if (name == "bool") return arrow::boolean();
+    if (name == "string") return arrow::utf8();
     if (name == "date") return arrow::date64();
+    if (name == "timestamp") return arrow::timestamp(arrow::TimeUnit::MILLI);
 
-    throw NotImplementedException("Unsupported type: " + name);
-}
-
-unique_ptr<ArrowTypeInfo> GraphArFunctions::graphArT2ArrowTypeInfo(const std::string& name) {
-    if (name == "string") {
-        return make_uniq<ArrowTypeInfo>(ArrowTypeInfoType::STRING);
-    } else {
-        return nullptr;
-    }
+    throw NotImplementedException("Unsupported type for conversion to arrow: " + name);
 }
 
 Value GraphArFunctions::ArrowScalar2DuckValue(const std::shared_ptr<arrow::Scalar>& scalar) {
+    DUCKDB_GRAPHAR_LOG_WARN("ArrowScalar2DuckValue");
     if (!scalar->is_valid) {
         return Value();
     }
@@ -71,6 +66,9 @@ Value GraphArFunctions::ArrowScalar2DuckValue(const std::shared_ptr<arrow::Scala
         case arrow::Type::STRING:
         case arrow::Type::LARGE_STRING:
             return Value(static_cast<const arrow::StringScalar&>(*scalar).value->ToString());
+        case arrow::Type::TIMESTAMP: {
+            return Value::TIMESTAMP(timestamp_t(static_cast<const arrow::TimestampScalar&>(*scalar).value));
+        }
         default:
             throw duckdb::NotImplementedException("Arrow scalar type not supported: " + scalar->type->ToString());
     }
@@ -89,30 +87,6 @@ std::string GraphArFunctions::GetNameFromInfo(const std::shared_ptr<graphar::Ver
 template <>
 std::string GraphArFunctions::GetNameFromInfo(const std::shared_ptr<graphar::EdgeInfo>& info) {
     return info->GetSrcType() + "_" + info->GetEdgeType() + "_" + info->GetDstType();
-}
-
-graphar::Result<std::shared_ptr<arrow::Schema>> GraphArFunctions::NamesAndTypesToArrowSchema(
-    const vector<std::string>& names, const vector<std::string>& types) {
-    DUCKDB_GRAPHAR_LOG_TRACE("NamesAndTypesToArrowSchema");
-    std::vector<std::shared_ptr<arrow::Field>> fields;
-    for (idx_t i = 0; i < names.size(); ++i) {
-        fields.push_back(std::make_shared<arrow::Field>(names[i], graphArT2arrowT(types[i])));
-    }
-    DUCKDB_GRAPHAR_LOG_TRACE("NamesAndTypesToArrowSchema: returning...");
-    return arrow::schema(fields);
-}
-
-std::shared_ptr<arrow::Table> GraphArFunctions::EmptyTableFromNamesAndTypes(const vector<std::string>& names,
-                                                                            const vector<std::string>& types) {
-    auto maybe_schema = NamesAndTypesToArrowSchema(names, types);
-    if (maybe_schema.has_error()) {
-        throw InternalException(maybe_schema.error().message());
-    }
-    auto maybe_table = arrow::Table::MakeEmpty(maybe_schema.value());
-    if (!maybe_table.ok()) {
-        throw InternalException(maybe_table.status().message());
-    }
-    return maybe_table.ValueUnsafe();
 }
 
 std::shared_ptr<graphar::Expression> GraphArFunctions::GetFilter(const std::string& filter_type,
