@@ -1,8 +1,8 @@
 #pragma once
 
-#include <atomic>
-
 #include <duckdb/function/table_function.hpp>
+
+#include <atomic>
 #include <duckdb.hpp>
 
 namespace duckdb {
