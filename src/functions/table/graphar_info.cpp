@@ -13,7 +13,7 @@ unique_ptr<FunctionData> GraphArInfo::Bind(ClientContext& context, TableFunction
     names.emplace_back("extension_commit");
     return_types.emplace_back(LogicalType::VARCHAR);
     names.emplace_back("build_timestamp");
-    return_types.emplace_back(LogicalType::TIMESTAMP);
+    return_types.emplace_back(LogicalType::TIMESTAMP_TZ);
     return nullptr;
 }
 
