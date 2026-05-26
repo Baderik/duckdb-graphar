@@ -1,16 +1,17 @@
 #pragma once
 
-#include <duckdb/function/table_function.hpp>
+#include <atomic>
 
+#include <duckdb/function/table_function.hpp>
 #include <duckdb.hpp>
 
 namespace duckdb {
 
 class GraphArVersionData : public GlobalTableFunctionState {
 public:
-    GraphArVersionData() : finished(false) {}
+    GraphArVersionData() = default;
 
-    bool finished;
+    std::atomic<bool> finished{false};
 };
 
 class GraphArInfo : public TableFunction {

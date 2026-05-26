@@ -23,7 +23,7 @@ unique_ptr<GlobalTableFunctionState> GraphArInfo::Init(ClientContext& context, T
 
 void GraphArInfo::Execute(ClientContext& context, TableFunctionInput& data_p, DataChunk& output) {
     auto& data = data_p.global_state->Cast<GraphArVersionData>();
-    if (data.finished) {
+    if (data.finished.exchange(true, std::memory_order_relaxed)) {
         return;
     }
     output.SetCardinality(1);
@@ -39,8 +39,6 @@ void GraphArInfo::Execute(ClientContext& context, TableFunctionInput& data_p, Da
 #else
     output.SetValue(1, 0, Value(0));
 #endif
-
-    data.finished = true;
 }
 
 TableFunctionSet GraphArInfo::GetFunctions() {
