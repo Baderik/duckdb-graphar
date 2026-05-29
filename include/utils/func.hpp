@@ -37,8 +37,6 @@ struct GraphArFunctions {
 
     static std::shared_ptr<arrow::DataType> graphArT2arrowT(const std::string& name);
 
-    static unique_ptr<ArrowTypeInfo> graphArT2ArrowTypeInfo(const std::string& name);
-
     static Value ArrowScalar2DuckValue(const std::shared_ptr<arrow::Scalar>& scalar);
 
     template <typename Info>
