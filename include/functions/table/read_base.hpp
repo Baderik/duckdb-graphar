@@ -455,7 +455,7 @@ public:
         ReadBaseGlobalTableFunctionState& gstate = input.global_state->Cast<ReadBaseGlobalTableFunctionState>();
         ReadBaseLocalTableFunctionState& lstate = input.local_state->Cast<ReadBaseLocalTableFunctionState>();
 
-        DUCKDB_GRAPHAR_LOG_DEBUG("Chunk " + std::to_string(gstate.chunk_count) + ": Begin iteration");
+        // DUCKDB_GRAPHAR_LOG_DEBUG("Chunk " + std::to_string(gstate.chunk_count) + ": Begin iteration");
 
         bool needs_new_file = false;
         for (auto& reader : lstate.readers) {
@@ -505,8 +505,8 @@ public:
         output.SetCapacity(num_rows);
         output.SetCardinality(num_rows);
         gstate.total_rows += num_rows;
-        DUCKDB_GRAPHAR_LOG_DEBUG("Size of chunk: " + std::to_string(num_rows) +
-                                 " Total size: " + std::to_string(gstate.total_rows))
+        // DUCKDB_GRAPHAR_LOG_DEBUG("Size of chunk: " + std::to_string(num_rows) +
+        //                          " Total size: " + std::to_string(gstate.total_rows))
         if (time_logging) {
             t.print();
         }

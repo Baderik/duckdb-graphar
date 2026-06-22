@@ -41,6 +41,9 @@ static void LoadInternal(ExtensionLoader& loader) {
     config.AddExtensionOption("graphar_time_logging", "Enable time logging for GraphAr requests.", LogicalType::BOOLEAN,
                               Value::BOOLEAN(false));
 
+    config.AddExtensionOption("graphar_use_optimize", "Enable graphar join optimization.", LogicalType::BOOLEAN,
+                              Value::BOOLEAN(true));
+
     GlobalLogManager::Initialize(loader.GetDatabaseInstance());
 
     ReadVertices::Register(loader);

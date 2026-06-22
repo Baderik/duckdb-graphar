@@ -33,5 +33,6 @@ struct GraphArSettings {
     }
 
     static bool is_time_logging(const ClientContext& context) { return get<bool>(context, "graphar_time_logging"); }
+    static bool use_optimize(const ClientContext& context) { return get<bool>(context, "graphar_use_optimize"); }
 };
 }  // namespace duckdb
