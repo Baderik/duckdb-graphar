@@ -58,7 +58,7 @@ static pair<ColumnBinding, ColumnBinding> GetReplaceBinding(const JoinCondition 
 
 static bool replaceColumnsInOperator(unique_ptr<LogicalOperator> &op, replace_col_map &replace_columns) {
     switch (op->type) {
-	    case LogicalOperatorType::LOGICAL_COMPARISON_JOIN:
+	    case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
             auto &join = op->Cast<LogicalComparisonJoin>();
             for (auto &condition : join.conditions) {
                 if (condition.left->type == ExpressionType::BOUND_COLUMN_REF) {
@@ -80,6 +80,22 @@ static bool replaceColumnsInOperator(unique_ptr<LogicalOperator> &op, replace_co
                 }
             }
             break;
+        }
+        default: {
+            for (auto &exp : op->expressions) {
+                switch (exp->type) {
+                    case (ExpressionType::BOUND_COLUMN_REF):
+                        auto &col = exp->Cast<BoundColumnRefExpression>();
+                        auto it = replace_columns.find(col.binding.ToString());
+                        while (it != replace_columns.end()) {
+                            col.binding = it->second;
+                            it = replace_columns.find(col.binding.ToString());
+                        }
+                        break;
+                }
+                
+            }
+        }
     }
 }
 
@@ -169,34 +185,13 @@ static OptimizeResult TryOptimizeVertexEdgeJoin(unique_ptr<LogicalOperator> &op,
 
     return result;
 }
+
 static OptimizeResult OptimizeJoins(unique_ptr<LogicalOperator> &op, replace_col_map &replace_columns, int &i, int depth = 1) {
     OptimizeResult result;
     int cur_i = i;
 
     DUCKDB_GRAPHAR_LOG_DEBUG("open: " + node_str(op, cur_i, depth) + "\n" + op->ToString());
-    DUCKDB_GRAPHAR_LOG_DEBUG("LO:\n" + GetInfoLogicalOperator(*op));
-
-    if (op->type == LogicalOperatorType::LOGICAL_PROJECTION) {
-        auto &proj = op->Cast<LogicalProjection>();
-        auto binds = proj.GetColumnBindings();
-
-        std::string temp;
-        for (auto &expr : proj.expressions) {
-            temp += expr->ToString() + ',';
-        }
-        std::string temp2;
-        for (auto &bind : binds) {
-            temp2 += bind.ToString() + ',';
-        }
-        DUCKDB_GRAPHAR_LOG_DEBUG("Projection: e:" + temp + "; b:" + temp2);
-    } else if (op->type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN) {
-        auto &join = op->Cast<LogicalComparisonJoin>();
-        DUCKDB_GRAPHAR_LOG_DEBUG("LOGICAL JOIN: " + GetInfoLogicalJoin(join));
-        DUCKDB_GRAPHAR_LOG_DEBUG("LOGICAL COMPARISON: " + GetInfoComparisonJoin(join)); 
-    } else if (op->type == LogicalOperatorType::LOGICAL_GET) {
-        auto &get = op->Cast<LogicalGet>();
-        DUCKDB_GRAPHAR_LOG_DEBUG("OGICAL GET:\n" + GetInfoLogicalGet(get));
-    }
+    DUCKDB_GRAPHAR_LOG_DEBUG(GetInfoLogical(*op));
 
     bool is_join = op->type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN;
 
@@ -254,16 +249,7 @@ static OptimizeResult OptimizeJoins(unique_ptr<LogicalOperator> &op, replace_col
         result.optimized = true;
         result.new_indexes = cur_result.new_indexes;
         DUCKDB_GRAPHAR_LOG_DEBUG("resolve " + node_str(op, cur_i, depth));
-        DUCKDB_GRAPHAR_LOG_DEBUG("LO:\n" + GetInfoLogicalOperator(*op) + '\n');
-        if (op->type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN) {
-            auto &join = op->Cast<LogicalComparisonJoin>();
-            DUCKDB_GRAPHAR_LOG_DEBUG("LJ:\n" + GetInfoLogicalJoin(join));
-            DUCKDB_GRAPHAR_LOG_DEBUG("CJ:\n" + GetInfoComparisonJoin(join));
-        }
-        if (op->type == LogicalOperatorType::LOGICAL_GET) {
-            auto &get = op->Cast<LogicalGet>();
-            DUCKDB_GRAPHAR_LOG_DEBUG("LG:\n" + GetInfoLogicalGet(get));
-        }
+        DUCKDB_GRAPHAR_LOG_DEBUG(GetInfoLogical(*op));
 
         replaceColumnsInOperator(op, replace_columns);
     }

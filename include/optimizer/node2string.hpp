@@ -56,7 +56,7 @@ std::string GetStringE(const unique_ptr<Expression> &expr) {
 	// 	return LogBound(expr->Cast<BoundCastExpression>());
 	// 	break;
 	case ExpressionClass::BOUND_COLUMN_REF:
-		return "JOIN HERE " + LogBound(expr->Cast<BoundColumnRefExpression>());
+		return LogBound(expr->Cast<BoundColumnRefExpression>());
 	// case ExpressionClass::BOUND_COMPARISON:
 	// 	return LogBound(expr->Cast<BoundComparisonExpression>());
 	// 	break;
@@ -91,7 +91,7 @@ std::string GetStringE(const unique_ptr<Expression> &expr) {
 	// 	return LogBound(expr->Cast<BoundUnnestExpression>());
 	// 	break;
 	default:
-        return ExpressionClassToString(expr->GetExpressionClass()) + "!: " + expr->ToString();
+        return ExpressionClassToString(expr->GetExpressionClass()) + ": " + expr->ToString();
 		// throw InternalException("Unrecognized expression type in logical operator visitor");
 	}
     //     expr->
@@ -187,6 +187,53 @@ std::string GetInfoLogicalGet(LogicalGet &op) {
     result += "Projections input: " + GetStringL<idx_t>(op.projected_input, [](const auto &el){return std::to_string(el);}) + '\n';
 
     return result;
+}
+
+std::string GetInfoLogicalAggregate(LogicalAggregate &op) {
+    std::string result;
+    result += "GroupIdx: " + std::to_string(op.group_index) + '\n';
+    result += "AggregateIdx: " + std::to_string(op.aggregate_index) + '\n';
+    result += "GroupingsIdx: " + std::to_string(op.groupings_index) + '\n';
+    result += "Groups: " + GetStringL<unique_ptr<Expression>>(op.groups, [](const auto &expr){return GetStringE(expr);}) + '\n';
+    result += "GroupStats: " + GetStringL<unique_ptr<BaseStatistics>>(op.group_stats, [](const auto &stat){return stat->ToString();}) + '\n';
+    result += "Validity: " + std::to_string(op.distinct_validity == TupleDataValidityType::CANNOT_HAVE_NULL_VALUES) + '\n';
+
+    return result;
+}
+
+std::string GetInfoLogical(LogicalOperator &op) {
+    std::string result = "LO:\n";
+    result += GetInfoLogicalOperator(op);
+
+    switch (op.type) {
+        case LogicalOperatorType::LOGICAL_GET: {
+            auto &get = op.Cast<LogicalGet>();
+            result += GetInfoLogicalGet(get);
+            break;
+        }
+        case LogicalOperatorType::LOGICAL_JOIN: {
+            auto &join = op.Cast<LogicalJoin>();
+            result += GetInfoLogicalJoin(join);
+            break;
+        }
+        case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
+            auto &join = op.Cast<LogicalJoin>();
+            result += GetInfoLogicalJoin(join) + '\n';
+            auto &comp_join = op.Cast<LogicalComparisonJoin>();
+            result += GetInfoComparisonJoin(comp_join);
+            break;
+        }
+        case LogicalOperatorType::LOGICAL_AGGREGATE_AND_GROUP_BY: {
+            auto &agg = op.Cast<LogicalAggregate>();
+            result += GetInfoLogicalAggregate(agg);
+            break;
+        }
+        default: {
+            result += "Special operator";
+            break;
+        }
+    }
+    return result; 
 }
 
 std::string GetGraphArFunctionName(const LogicalOperator &op) {
