@@ -5,6 +5,7 @@
 namespace duckdb {
 
 using replace_col_map = unordered_map<string, ColumnBinding>;
+using using_col_set = unordered_map<idx_t, unordered_set<idx_t>>;
 
 class GraphArOptimizerExtension : public OptimizerExtension {
 public:

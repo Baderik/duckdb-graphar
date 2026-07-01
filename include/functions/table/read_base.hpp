@@ -450,7 +450,7 @@ public:
 
         ScopedTimer t("Execute");
 
-        DUCKDB_GRAPHAR_LOG_DEBUG("::Execute Cast state");
+        // DUCKDB_GRAPHAR_LOG_DEBUG("::Execute Cast state");
 
         ReadBaseGlobalTableFunctionState& gstate = input.global_state->Cast<ReadBaseGlobalTableFunctionState>();
         ReadBaseLocalTableFunctionState& lstate = input.local_state->Cast<ReadBaseLocalTableFunctionState>();
@@ -478,7 +478,7 @@ public:
             if (IsNullPtr(reader)) continue;
             num_rows = std::min(num_rows, GetRowsNum(reader));
         }
-        DUCKDB_GRAPHAR_LOG_DEBUG("num rows final: " + std::to_string(num_rows));
+        // DUCKDB_GRAPHAR_LOG_DEBUG("num rows final: " + std::to_string(num_rows));
 
         if (num_rows > 0) {
             bool chunk_id_set = false;

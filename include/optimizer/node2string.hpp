@@ -124,14 +124,15 @@ std::string GetInfoLogicalOperator(LogicalOperator &op) {
     
     const auto binds = op.GetColumnBindings();
     result += "Bindings: size=" + std::to_string(binds.size()) + " " + op.ColumnBindingsToString(binds) + '\n';
-    // if (!binds.empty()) {
-    //     result += "root idx: " + std::to_string(op.GetRootIndex()) + '\n';
-    // }
     const auto params = op.ParamsToString();
     result += "params: size=" + std::to_string(params.size()) + " ";
     for (const auto &param : params) {
         result += "," + param.first + "=" + param.second;
     }
+    result += '\n';
+
+    result += "HasProjectionMap: " + std::to_string(op.HasProjectionMap()) + '\n';
+    result += "TableIdx: " + GetStringL<idx_t>(op.GetTableIndex(), [](const auto &idx){return std::to_string(idx);});
 
     return result;
 }
@@ -203,7 +204,7 @@ std::string GetInfoLogicalAggregate(LogicalAggregate &op) {
 
 std::string GetInfoLogical(LogicalOperator &op) {
     std::string result = "LO:\n";
-    result += GetInfoLogicalOperator(op);
+    result += GetInfoLogicalOperator(op) + '\n';
 
     switch (op.type) {
         case LogicalOperatorType::LOGICAL_GET: {
