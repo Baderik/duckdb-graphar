@@ -9,7 +9,7 @@ using using_col_set = unordered_map<idx_t, unordered_set<idx_t>>;
 
 class GraphArOptimizerExtension : public OptimizerExtension {
 public:
-	GraphArOptimizerExtension();
+    GraphArOptimizerExtension();
 };
 
-} // namespace duckdb
+}  // namespace duckdb

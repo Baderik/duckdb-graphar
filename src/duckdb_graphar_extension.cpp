@@ -9,8 +9,8 @@
 #include "functions/table/hop_thread.hpp"
 #include "functions/table/read_edges.hpp"
 #include "functions/table/read_vertices.hpp"
-#include "storage/graphar_storage.hpp"
 #include "optimizer/graphar_optimizer.hpp"
+#include "storage/graphar_storage.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
 
@@ -57,7 +57,6 @@ static void LoadInternal(ExtensionLoader& loader) {
 
     StorageExtension::Register(config, "duckdb_graphar", make_shared_ptr<GraphArStorageExtension>());
     OptimizerExtension::Register(config, GraphArOptimizerExtension());
-
 
     auto callback = make_shared_ptr<S3CleanupCallback>();
     ExtensionCallback::Register(loader.GetDatabaseInstance().config, callback);
