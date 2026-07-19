@@ -29,7 +29,7 @@ namespace duckdb {
 void ReadVertices::SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info,
                                std::shared_ptr<graphar::VertexInfo> vertex_info, unique_ptr<ReadBindData>& bind_data) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadVertices::SetBindData");
-    ReadBase::SetBindData(graph_info, vertex_info, bind_data, "read_vertices", 1, 0, {GID_COLUMN_INTERNAL});
+    ReadBase::SetBindData(graph_info, vertex_info, bind_data, GetFunctionName(), 1, 0, {GID_COLUMN_INTERNAL});
 }
 //-------------------------------------------------------------------
 // Bind
@@ -154,15 +154,7 @@ ReaderPtr ReadVertices::GetReader(ClientContext& context, ReadBaseGlobalTableFun
 //-------------------------------------------------------------------
 unique_ptr<BaseStatistics> ReadVertices::GetStatistics(ClientContext& context, const FunctionData* bind_data,
                                                        column_t column_index) {
-    DUCKDB_GRAPHAR_LOG_TRACE("ReadVertices::GetStatistics");
-    auto read_bind_data = bind_data->Cast<ReadBindData>();
-    if (column_index < 0 || column_index >= read_bind_data.GetFlattenPropTypes().size()) {
-        return nullptr;
-    }
-    auto duck_type = GraphArFunctions::graphArT2duckT(read_bind_data.GetFlattenPropTypes()[column_index]);
-    auto column_name = read_bind_data.GetFlattenPropNames()[column_index];
-    auto stats = BaseStatistics::CreateUnknown(duck_type);
-    return stats.ToUnique();
+    return ReadBase<ReadVertices>::GetStatistics(context, bind_data, column_index);
 }
 //-------------------------------------------------------------------
 // PushdownComplexFilter
@@ -206,7 +198,7 @@ static void InitFunction(TableFunction& read_vertices) {
 // GetFunction
 //-------------------------------------------------------------------
 TableFunction ReadVertices::GetFunction() {
-    TableFunction read_vertices("read_vertices", {LogicalType::VARCHAR}, Execute, Bind);
+    TableFunction read_vertices(GetFunctionName(), {LogicalType::VARCHAR}, Execute, Bind);
     InitFunction(read_vertices);
 
     read_vertices.named_parameters["type"] = LogicalType::VARCHAR;

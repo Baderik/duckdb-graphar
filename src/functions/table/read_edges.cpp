@@ -28,7 +28,7 @@ namespace duckdb {
 void ReadEdges::SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info,
                             std::shared_ptr<graphar::EdgeInfo> edge_info, unique_ptr<ReadBindData>& bind_data) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::SetBindData");
-    ReadBase::SetBindData(graph_info, edge_info, bind_data, "read_edges", 0, 1, {SRC_GID_COLUMN, DST_GID_COLUMN});
+    ReadBase::SetBindData(graph_info, edge_info, bind_data, GetFunctionName(), 0, 1, {SRC_GID_COLUMN, DST_GID_COLUMN});
 }
 //-------------------------------------------------------------------
 // Bind
@@ -83,7 +83,7 @@ unique_ptr<FunctionData> ReadEdges::Bind(ClientContext& context, TableFunctionBi
 BaseReaderPtr ReadEdges::GetBaseReader(ClientContext& context, ReadBaseGlobalTableFunctionState& gstate, idx_t ind,
                                        const std::string& filter_column,
                                        std::shared_ptr<graphar::SharedChunkCounter> counter) {
-    DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetReader");
+    DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetBaseReader");
     graphar::AdjListType adj_list_type;
     if (filter_column == "" or filter_column == SRC_GID_COLUMN) {
         adj_list_type = graphar::AdjListType::ordered_by_source;
@@ -210,15 +210,7 @@ ReaderPtr ReadEdges::GetReader(ClientContext& context, ReadBaseGlobalTableFuncti
 //-------------------------------------------------------------------
 unique_ptr<BaseStatistics> ReadEdges::GetStatistics(ClientContext& context, const FunctionData* bind_data,
                                                     column_t column_index) {
-    DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::GetStatistics");
-    auto read_bind_data = bind_data->Cast<ReadBindData>();
-    if (column_index < 0 || column_index >= read_bind_data.GetFlattenPropTypes().size()) {
-        return nullptr;
-    }
-    auto duck_type = GraphArFunctions::graphArT2duckT(read_bind_data.GetFlattenPropTypes()[column_index]);
-    auto column_name = read_bind_data.GetFlattenPropNames()[column_index];
-    auto stats = BaseStatistics::CreateUnknown(duck_type);
-    return stats.ToUnique();
+    return ReadBase<ReadEdges>::GetStatistics(context, bind_data, column_index);
 }
 //-------------------------------------------------------------------
 // PushdownComplexFilter
@@ -273,7 +265,7 @@ static void InitFunction(TableFunction& read_edges) {
 // GetFunction
 //-------------------------------------------------------------------
 TableFunction ReadEdges::GetFunction() {
-    TableFunction read_edges("read_edges", {LogicalType::VARCHAR}, Execute, Bind);
+    TableFunction read_edges(GetFunctionName(), {LogicalType::VARCHAR}, Execute, Bind);
     InitFunction(read_edges);
 
     read_edges.named_parameters["src"] = LogicalType::VARCHAR;

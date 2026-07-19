@@ -122,22 +122,6 @@ std::string GetYamlContent(const std::string& path);
 void ConvertArrowTableToDataChunk(const arrow::Table& table, DataChunk& output, const std::vector<column_t>& column_ids,
                                   ClientContext& context);
 
-class S3CleanupCallback : public ExtensionCallback {
-private:
-    std::atomic<int> active_connections{0};
-
-public:
-    void OnConnectionOpened(ClientContext& context) override { active_connections++; }
-
-    void OnConnectionClosed(ClientContext& context) override {
-        if (--active_connections == 0) {
-            if (arrow::fs::IsS3Initialized() && !arrow::fs::IsS3Finalized()) {
-                graphar::FinalizeS3();
-            }
-        }
-    }
-};
-
 static idx_t GetChunkIdx(duckdb::idx_t result_idx, duckdb::idx_t read_idx) {
     if (result_idx > NumericLimits<uint32_t>::Maximum() || read_idx > NumericLimits<uint32_t>::Maximum()) {
         throw OutOfRangeException("Overflow encountered in GetChunkIdx with result_idx = %llu and read_idx = %llu",
@@ -145,5 +129,7 @@ static idx_t GetChunkIdx(duckdb::idx_t result_idx, duckdb::idx_t read_idx) {
     }
     return (result_idx) << 32 | read_idx;
 }
+
+static idx_t GetResultIdx(duckdb::idx_t chunk_idx) { return chunk_idx >> 32; }
 
 }  // namespace duckdb
