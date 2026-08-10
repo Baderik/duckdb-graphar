@@ -82,6 +82,9 @@ static bool replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_co
         }
         default: {
             for (auto& exp : op->expressions) {
+                if (exp == nullptr) {
+                    continue;
+                }
                 switch (exp->type) {
                     case (ExpressionType::BOUND_COLUMN_REF):
                         auto& col = exp->Cast<BoundColumnRefExpression>();
@@ -98,9 +101,12 @@ static bool replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_co
 }
 
 static bool useColumnsInOperator(const LogicalOperator& op, using_col_set& used_columns) {
+    DUCKDB_GRAPHAR_LOG_TRACE("useColumnsInOperator");
     switch (op.type) {
         case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
+            DUCKDB_GRAPHAR_LOG_TRACE("LOGICAL_COMPARISON_JOIN");
             const auto& join = op.Cast<LogicalComparisonJoin>();
+            DUCKDB_GRAPHAR_LOG_TRACE("Cast");
             for (const auto& condition : join.conditions) {
                 if (condition.left->type == ExpressionType::BOUND_COLUMN_REF) {
                     const auto& col = condition.left->Cast<BoundColumnRefExpression>();
@@ -116,9 +122,17 @@ static bool useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
             break;
         }
         default: {
+            DUCKDB_GRAPHAR_LOG_TRACE("LO default");
             for (const auto& exp : op.expressions) {
+                DUCKDB_GRAPHAR_LOG_TRACE("exp " + std::to_string(exp != nullptr) + " " +
+                                         std::to_string(op.expressions.size()));
+                if (exp == nullptr) {
+                    DUCKDB_GRAPHAR_LOG_WARN("exp = nullptr");
+                    continue;
+                }
                 switch (exp->type) {
                     case (ExpressionType::BOUND_COLUMN_REF):
+                        DUCKDB_GRAPHAR_LOG_TRACE("E BOUND_COLUMN_REF");
                         const auto& col = exp->Cast<BoundColumnRefExpression>();
 
                         used_columns[col.binding.table_index].emplace(col.binding.column_index);
@@ -167,7 +181,7 @@ static OptimizeResult TryOptimizeVertexEdgeJoin(unique_ptr<LogicalOperator>& op,
     const auto right_name = GetGraphArFunctionName(*right);
 
     if (left_name.empty() || right_name.empty()) {
-        // DUCKDB_GRAPHAR_LOG_DEBUG("unchanged join\n" + join.ToString());
+        DUCKDB_GRAPHAR_LOG_DEBUG("unchanged join\n" + join.ToString());
         return result;
     }
 
@@ -180,19 +194,19 @@ static OptimizeResult TryOptimizeVertexEdgeJoin(unique_ptr<LogicalOperator>& op,
 
     if (left_vertex) {
         if (!checkVertexTable(*left, used_columns)) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG("left vertex table cannot be used");
+            DUCKDB_GRAPHAR_LOG_DEBUG("left vertex table cannot be used");
             return result;
         }
     } else {
         if (!checkVertexTable(*right, used_columns)) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG("right vertex table cannot be used");
+            DUCKDB_GRAPHAR_LOG_DEBUG("right vertex table cannot be used");
             return result;
         }
     }
 
     result.optimized = true;
 
-    // DUCKDB_GRAPHAR_LOG_DEBUG("ln: " + left_name + " rn: " + right_name);
+    DUCKDB_GRAPHAR_LOG_DEBUG("ln: " + left_name + " rn: " + right_name);
     idx_t vertex_table;
     if (left_name == "read_edges") {
         auto vertex_binds = right->GetColumnBindings();
@@ -252,18 +266,24 @@ static OptimizeResult OptimizeJoins(unique_ptr<LogicalOperator>& op, replace_col
     OptimizeResult result;
     int cur_i = i;
 
-    // DUCKDB_GRAPHAR_LOG_DEBUG("open: " + node_str(op, cur_i, depth) + "\n" + op->ToString());
-    // DUCKDB_GRAPHAR_LOG_DEBUG(GetInfoLogical(*op));
+    if (op == nullptr) {
+        DUCKDB_GRAPHAR_LOG_WARN("op = nullptr: i=" + std::to_string(i) + " depth=" + std::to_string(depth));
+        return result;
+    }
+
+    DUCKDB_GRAPHAR_LOG_DEBUG("open: " + node_str(op, cur_i, depth) + "\n" + op->ToString());
+    DUCKDB_GRAPHAR_LOG_DEBUG(GetInfoLogical(*op));
 
     useColumnsInOperator(*op, used_columns);
+    DUCKDB_GRAPHAR_LOG_DEBUG("After use columns in operator");
 
     bool is_join = op->type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN;
 
     for (int child_i = 0; child_i < op->children.size(); ++child_i) {
         ++i;
         if (op->children[child_i]) {
-            // DUCKDB_GRAPHAR_LOG_DEBUG(node_str(op, cur_i, depth) + " go to child child_i=" + std::to_string(child_i) +
-            // " " + node_str(op->children[child_i], i, depth + 1));
+            DUCKDB_GRAPHAR_LOG_DEBUG(node_str(op, cur_i, depth) + " go to child child_i=" + std::to_string(child_i) +
+                                     " " + node_str(op->children[child_i], i, depth + 1));
             auto child_result = OptimizeJoins(op->children[child_i], replace_columns, used_columns, i, depth + 1);
             result.optimized = result.optimized || child_result.optimized;
 
@@ -296,26 +316,26 @@ static OptimizeResult OptimizeJoins(unique_ptr<LogicalOperator>& op, replace_col
         }
     }
     if (result.optimized) {
-        // DUCKDB_GRAPHAR_LOG_DEBUG("child was optimized " + node_str(op, cur_i, depth) + ";\n" + op->ToString());
-        // DUCKDB_GRAPHAR_LOG_DEBUG("LO:\n" + GetInfoLogicalOperator(*op) + '\n');
+        DUCKDB_GRAPHAR_LOG_DEBUG("child was optimized " + node_str(op, cur_i, depth) + ";\n" + op->ToString());
+        DUCKDB_GRAPHAR_LOG_DEBUG("LO:\n" + GetInfoLogicalOperator(*op) + '\n');
         if (op->type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN) {
             auto& join = op->Cast<LogicalComparisonJoin>();
-            // DUCKDB_GRAPHAR_LOG_DEBUG("LJ:\n" + GetInfoLogicalJoin(join));
-            // DUCKDB_GRAPHAR_LOG_DEBUG("CJ:\n" + GetInfoComparisonJoin(join));
+            DUCKDB_GRAPHAR_LOG_DEBUG("LJ:\n" + GetInfoLogicalJoin(join));
+            DUCKDB_GRAPHAR_LOG_DEBUG("CJ:\n" + GetInfoComparisonJoin(join));
         }
         if (op->type == LogicalOperatorType::LOGICAL_GET) {
             auto& get = op->Cast<LogicalGet>();
-            // DUCKDB_GRAPHAR_LOG_DEBUG("LG:\n" + GetInfoLogicalGet(get));
+            DUCKDB_GRAPHAR_LOG_DEBUG("LG:\n" + GetInfoLogicalGet(get));
         }
     }
     auto cur_result = TryOptimizeVertexEdgeJoin(op, replace_columns, used_columns);
-    // DUCKDB_GRAPHAR_LOG_DEBUG("child was optimized: " + std::to_string(result.optimized) + " cur optimized: " +
-    // std::to_string(cur_result.optimized));
+    DUCKDB_GRAPHAR_LOG_DEBUG("child was optimized: " + std::to_string(result.optimized) +
+                             " cur optimized: " + std::to_string(cur_result.optimized));
     if (cur_result.optimized || result.optimized) {
         result.optimized = true;
         result.new_indexes = cur_result.new_indexes;
-        // DUCKDB_GRAPHAR_LOG_DEBUG("resolve " + node_str(op, cur_i, depth));
-        // DUCKDB_GRAPHAR_LOG_DEBUG(GetInfoLogical(*op));
+        DUCKDB_GRAPHAR_LOG_DEBUG("resolve " + node_str(op, cur_i, depth));
+        DUCKDB_GRAPHAR_LOG_DEBUG(GetInfoLogical(*op));
 
         replaceColumnsInOperator(op, replace_columns);
     }
