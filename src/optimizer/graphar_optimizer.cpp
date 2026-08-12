@@ -81,8 +81,11 @@ static bool replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_co
             break;
         }
         default: {
-            for (auto& exp : op->expressions) {
+            const size_t exp_size = op->expressions.size();
+            for (size_t i = 0; i < exp_size; ++i) {
+                auto& exp = op->expressions[i];
                 if (exp == nullptr) {
+                    DUCKDB_GRAPHAR_LOG_WARN("replace exp = nullptr");
                     continue;
                 }
                 switch (exp->type) {
@@ -122,12 +125,16 @@ static bool useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
             break;
         }
         default: {
-            DUCKDB_GRAPHAR_LOG_TRACE("LO default");
-            for (const auto& exp : op.expressions) {
-                DUCKDB_GRAPHAR_LOG_TRACE("exp " + std::to_string(exp != nullptr) + " " +
+            DUCKDB_GRAPHAR_LOG_TRACE("LO default");            
+            const size_t exp_size = op.expressions.size();
+            DUCKDB_GRAPHAR_LOG_TRACE("exp_size " + std::to_string(exp_size));
+            for (size_t i = 0; i < exp_size; ++i) {
+                DUCKDB_GRAPHAR_LOG_TRACE("exp_i " + std::to_string(i) + " exp_size " + std::to_string(op.expressions.size()));
+                auto& exp = op.expressions[i];
+                DUCKDB_GRAPHAR_LOG_TRACE("use exp " + std::to_string(exp != nullptr) + " " +
                                          std::to_string(op.expressions.size()));
                 if (exp == nullptr) {
-                    DUCKDB_GRAPHAR_LOG_WARN("exp = nullptr");
+                    DUCKDB_GRAPHAR_LOG_WARN("use exp = nullptr");
                     continue;
                 }
                 switch (exp->type) {
