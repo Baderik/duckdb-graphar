@@ -56,6 +56,7 @@ static pair<ColumnBinding, ColumnBinding> GetReplaceBinding(const JoinCondition&
 }
 
 static bool replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_col_map& replace_columns) {
+    DUCKDB_GRAPHAR_LOG_TRACE("replaceColumnsInOperator");
     switch (op->type) {
         case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
             auto& join = op->Cast<LogicalComparisonJoin>();
@@ -101,6 +102,7 @@ static bool replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_co
             }
         }
     }
+    DUCKDB_GRAPHAR_LOG_TRACE("success replaceColumnsInOperator");
 }
 
 static bool useColumnsInOperator(const LogicalOperator& op, using_col_set& used_columns) {
@@ -148,6 +150,7 @@ static bool useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
             }
         }
     }
+    DUCKDB_GRAPHAR_LOG_TRACE("success useColumnsInOperator");
 }
 
 static bool checkVertexTable(const LogicalOperator& op, using_col_set& used_columns) {
