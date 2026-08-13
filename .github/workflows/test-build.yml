@@ -94,10 +94,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ hashFiles('Makefile', 'CMakeLists.txt', 'extension_config.cmake') }}-${{ github.sha }}
+          key: ${{ runner.os }}-ccache-${{ hashFiles('Makefile', 'CMakeLists.txt', 'extension_config.cmake') }}
           restore-keys: |
-            ${{ runner.os }}-ccache-${{ hashFiles('Makefile', 'CMakeLists.txt', 'extension_config.cmake') }}
-            ${{ runner.os }}-ccache-
+            ${{ runner.os }}-ccache
 
       - name: Cache Arrow and GraphAr
         id: cache-third-party
@@ -107,7 +106,7 @@ jobs:
             third_party/
           key: ${{ runner.os }}-third-party-${{ hashFiles('Makefile') }}
           restore-keys: |
-            ${{ runner.os }}-third-party-
+            ${{ runner.os }}-third-party
 
       - name: Skip Arrow/GraphAr build if cached
         if: steps.cache-third-party.outputs.cache-hit == 'true'
