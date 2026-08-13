@@ -382,7 +382,7 @@ static void GetOperatorTree(LogicalOperator& op, std::string& result) {
 }
 
 static bool HasGraphArScan(LogicalOperator& op) {
-    DUCKDB_GRAPHAR_LOG_TRACE("HasGraphArScan " + op.GetName);
+    DUCKDB_GRAPHAR_LOG_TRACE("HasGraphArScan " + op.GetName());
     if (op.type == LogicalOperatorType::LOGICAL_GET) {
         auto& get = op.Cast<LogicalGet>();
         return get.function.name == "read_edges" || get.function.name == "read_vertices";
