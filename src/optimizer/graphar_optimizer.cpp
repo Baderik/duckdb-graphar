@@ -127,7 +127,7 @@ static bool useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
             break;
         }
         default: {
-            DUCKDB_GRAPHAR_LOG_TRACE("LO default");            
+            DUCKDB_GRAPHAR_LOG_TRACE("LO default");
             const size_t exp_size = op.expressions.size();
             DUCKDB_GRAPHAR_LOG_TRACE("exp_size " + std::to_string(exp_size));
             for (size_t i = 0; i < exp_size; ++i) {
@@ -382,6 +382,7 @@ static void GetOperatorTree(LogicalOperator& op, std::string& result) {
 }
 
 static bool HasGraphArScan(LogicalOperator& op) {
+    DUCKDB_GRAPHAR_LOG_TRACE("HasGraphArScan " + op.GetName);
     if (op.type == LogicalOperatorType::LOGICAL_GET) {
         auto& get = op.Cast<LogicalGet>();
         return get.function.name == "read_edges" || get.function.name == "read_vertices";
@@ -419,7 +420,12 @@ static void GraphArPreOptimize(OptimizerExtensionInput& input, unique_ptr<Logica
 static void GraphArOptimize(OptimizerExtensionInput& input, unique_ptr<LogicalOperator>& plan) {
     DUCKDB_GRAPHAR_LOG_TRACE("GraphArOptimize");
 
-    // После оптимизации уже
+    // После оптимизации ужеA
+
+    if (plan == nullptr) {
+        DUCKDB_GRAPHAR_LOG_WARN("plan = nullptr");
+        return;
+    }
 
     const bool hasGraphArScan = HasGraphArScan(*plan);
 
@@ -436,7 +442,7 @@ static void GraphArOptimize(OptimizerExtensionInput& input, unique_ptr<LogicalOp
         using_col_set used_columns;
 
         if (OptimizeJoins(plan, replace_columns, used_columns, i).optimized) {
-            DUCKDB_GRAPHAR_LOG_DEBUG("GraphAr Join optimization applied")
+            DUCKDB_GRAPHAR_LOG_DEBUG("GraphAr Join optimization applied");
             plan->ResolveOperatorTypes();
             DUCKDB_GRAPHAR_LOG_DEBUG("Final plan:\n" + plan->ToString());
             // LoggingWalk(*plan);
