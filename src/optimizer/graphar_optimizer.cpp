@@ -56,7 +56,7 @@ static pair<ColumnBinding, ColumnBinding> GetReplaceBinding(const JoinCondition&
 }
 
 static void replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_col_map& replace_columns) {
-    DUCKDB_GRAPHAR_LOG_TRACE("replaceColumnsInOperator");
+    // DUCKDB_GRAPHAR_LOG_TRACE("replaceColumnsInOperator");
     switch (op->type) {
         case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
             auto& join = op->Cast<LogicalComparisonJoin>();
@@ -102,16 +102,16 @@ static void replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_co
             }
         }
     }
-    DUCKDB_GRAPHAR_LOG_TRACE("success replaceColumnsInOperator");
+    // DUCKDB_GRAPHAR_LOG_TRACE("success replaceColumnsInOperator");
 }
 
 static void useColumnsInOperator(const LogicalOperator& op, using_col_set& used_columns) {
-    DUCKDB_GRAPHAR_LOG_TRACE("useColumnsInOperator");
+    // DUCKDB_GRAPHAR_LOG_TRACE("useColumnsInOperator");
     switch (op.type) {
         case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
-            DUCKDB_GRAPHAR_LOG_TRACE("LOGICAL_COMPARISON_JOIN");
+            // DUCKDB_GRAPHAR_LOG_TRACE("LOGICAL_COMPARISON_JOIN");
             const auto& join = op.Cast<LogicalComparisonJoin>();
-            DUCKDB_GRAPHAR_LOG_TRACE("Cast");
+            // DUCKDB_GRAPHAR_LOG_TRACE("Cast");
             for (const auto& condition : join.conditions) {
                 if (condition.left->type == ExpressionType::BOUND_COLUMN_REF) {
                     const auto& col = condition.left->Cast<BoundColumnRefExpression>();
@@ -127,21 +127,21 @@ static void useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
             break;
         }
         default: {
-            DUCKDB_GRAPHAR_LOG_TRACE("LO default");
+            // DUCKDB_GRAPHAR_LOG_TRACE("LO default");
             const size_t exp_size = op.expressions.size();
-            DUCKDB_GRAPHAR_LOG_TRACE("exp_size " + std::to_string(exp_size));
+            // DUCKDB_GRAPHAR_LOG_TRACE("exp_size " + std::to_string(exp_size));
             for (size_t i = 0; i < exp_size; ++i) {
-                DUCKDB_GRAPHAR_LOG_TRACE("exp_i " + std::to_string(i) + " exp_size " + std::to_string(op.expressions.size()));
+                // DUCKDB_GRAPHAR_LOG_TRACE("exp_i " + std::to_string(i) + " exp_size " + std::to_string(op.expressions.size()));
                 auto& exp = op.expressions[i];
-                DUCKDB_GRAPHAR_LOG_TRACE("use exp " + std::to_string(exp != nullptr) + " " +
-                                         std::to_string(op.expressions.size()));
+                // DUCKDB_GRAPHAR_LOG_TRACE("use exp " + std::to_string(exp != nullptr) + " " +
+                                        //  std::to_string(op.expressions.size()));
                 if (exp == nullptr) {
                     DUCKDB_GRAPHAR_LOG_WARN("use exp = nullptr");
                     continue;
                 }
                 switch (exp->type) {
                     case (ExpressionType::BOUND_COLUMN_REF):
-                        DUCKDB_GRAPHAR_LOG_TRACE("E BOUND_COLUMN_REF");
+                        // DUCKDB_GRAPHAR_LOG_TRACE("E BOUND_COLUMN_REF");
                         const auto& col = exp->Cast<BoundColumnRefExpression>();
 
                         used_columns[col.binding.table_index].emplace(col.binding.column_index);
@@ -150,7 +150,7 @@ static void useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
             }
         }
     }
-    DUCKDB_GRAPHAR_LOG_TRACE("success useColumnsInOperator");
+    // DUCKDB_GRAPHAR_LOG_TRACE("success useColumnsInOperator");
 }
 
 static bool checkVertexTable(const LogicalOperator& op, using_col_set& used_columns) {
@@ -282,19 +282,19 @@ static OptimizeResult OptimizeJoins(unique_ptr<LogicalOperator>& op, replace_col
         return result;
     }
 
-    DUCKDB_GRAPHAR_LOG_DEBUG("open: " + node_str(op, cur_i, depth) + "\n" + op->ToString());
-    DUCKDB_GRAPHAR_LOG_DEBUG(GetInfoLogical(*op));
+    // DUCKDB_GRAPHAR_LOG_DEBUG("open: " + node_str(op, cur_i, depth) + "\n" + op->ToString());
+    // DUCKDB_GRAPHAR_LOG_DEBUG(GetInfoLogical(*op));
 
     useColumnsInOperator(*op, used_columns);
-    DUCKDB_GRAPHAR_LOG_DEBUG("After use columns in operator");
+    // DUCKDB_GRAPHAR_LOG_DEBUG("After use columns in operator");
 
     bool is_join = op->type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN;
 
     for (int child_i = 0; child_i < op->children.size(); ++child_i) {
         ++i;
         if (op->children[child_i]) {
-            DUCKDB_GRAPHAR_LOG_DEBUG(node_str(op, cur_i, depth) + " go to child child_i=" + std::to_string(child_i) +
-                                     " " + node_str(op->children[child_i], i, depth + 1));
+            // DUCKDB_GRAPHAR_LOG_DEBUG(node_str(op, cur_i, depth) + " go to child child_i=" + std::to_string(child_i) +
+                                    //  " " + node_str(op->children[child_i], i, depth + 1));
             auto child_result = OptimizeJoins(op->children[child_i], replace_columns, used_columns, i, depth + 1);
             result.optimized = result.optimized || child_result.optimized;
 
@@ -383,7 +383,7 @@ static void GetOperatorTree(LogicalOperator& op, std::string& result) {
 }
 
 static bool HasGraphArScan(LogicalOperator& op) {
-    DUCKDB_GRAPHAR_LOG_TRACE("HasGraphArScan " + op.GetName());
+    // DUCKDB_GRAPHAR_LOG_TRACE("HasGraphArScan " + op.GetName());
     if (op.type == LogicalOperatorType::LOGICAL_GET) {
         auto& get = op.Cast<LogicalGet>();
         return get.function.name == "read_edges" || get.function.name == "read_vertices";

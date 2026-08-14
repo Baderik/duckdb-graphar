@@ -52,7 +52,7 @@ static void LoadInternal(ExtensionLoader& loader) {
                               Value::BOOLEAN(false));
 
     config.AddExtensionOption("graphar_use_optimize", "Enable graphar join optimization.", LogicalType::BOOLEAN,
-                              Value::BOOLEAN(true));
+                              Value::BOOLEAN(false));
 
     GlobalLogManager::Initialize(loader.GetDatabaseInstance(), duckdb::LogLevel::LOG_WARNING);
 
