@@ -55,7 +55,7 @@ static pair<ColumnBinding, ColumnBinding> GetReplaceBinding(const JoinCondition&
     }
 }
 
-static bool replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_col_map& replace_columns) {
+static void replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_col_map& replace_columns) {
     DUCKDB_GRAPHAR_LOG_TRACE("replaceColumnsInOperator");
     switch (op->type) {
         case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
@@ -105,7 +105,7 @@ static bool replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_co
     DUCKDB_GRAPHAR_LOG_TRACE("success replaceColumnsInOperator");
 }
 
-static bool useColumnsInOperator(const LogicalOperator& op, using_col_set& used_columns) {
+static void useColumnsInOperator(const LogicalOperator& op, using_col_set& used_columns) {
     DUCKDB_GRAPHAR_LOG_TRACE("useColumnsInOperator");
     switch (op.type) {
         case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
@@ -161,7 +161,7 @@ static bool checkVertexTable(const LogicalOperator& op, using_col_set& used_colu
     const auto t_idx = get.table_index;
     auto it = used_columns.find(t_idx);
     if (it == used_columns.end()) {
-        return false;
+        return false; // TODO: must be true - unused vertex table so can be skipped, no?
     }
     if (it->second.size() > 1) {
         return false;
@@ -267,6 +267,7 @@ static OptimizeResult TryOptimizeVertexEdgeJoin(unique_ptr<LogicalOperator>& op,
         }
         op = std::move(right);
     }
+    op->ResolveOperatorTypes();
 
     return result;
 }
@@ -437,6 +438,7 @@ static void GraphArOptimize(OptimizerExtensionInput& input, unique_ptr<LogicalOp
     bool use_optimize = GraphArSettings::use_optimize(input.context);
 
     if (hasGraphArScan && use_optimize) {
+        plan->ResolveOperatorTypes();
         int i = 0;
         replace_col_map replace_columns;
         using_col_set used_columns;
