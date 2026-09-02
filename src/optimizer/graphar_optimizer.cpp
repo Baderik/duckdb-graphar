@@ -12,6 +12,8 @@
 #include "duckdb/planner/operator/logical_comparison_join.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
 #include "duckdb/planner/operator/logical_projection.hpp"
+#include "duckdb/planner/operator/logical_cte.hpp"
+#include "duckdb/planner/operator/logical_cteref.hpp"
 #include "optimizer/node2string.hpp"
 #include "utils/benchmark.hpp"
 #include "utils/global_log_manager.hpp"
@@ -396,22 +398,27 @@ static bool HasGraphArScan(LogicalOperator& op) {
     return false;
 }
 
-static void LoggingWalk(LogicalOperator& op) {
-    DUCKDB_GRAPHAR_LOG_DEBUG("LO:\n" + GetInfoLogicalOperator(op) + '\n');
-    if (op.type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN) {
-        auto& join = op.Cast<LogicalComparisonJoin>();
-        DUCKDB_GRAPHAR_LOG_DEBUG("LJ:\n" + GetInfoLogicalJoin(join));
-        DUCKDB_GRAPHAR_LOG_DEBUG("CJ:\n" + GetInfoComparisonJoin(join));
-    }
-    if (op.type == LogicalOperatorType::LOGICAL_GET) {
-        auto& get = op.Cast<LogicalGet>();
-        DUCKDB_GRAPHAR_LOG_DEBUG("LG:\n" + GetInfoLogicalGet(get));
-    }
+static void LoggingWalk(LogicalOperator& op, size_t &lo_i) {
+    DUCKDB_GRAPHAR_LOG_WARN("LO #" + std::to_string(lo_i) + ":\n" + GetInfoLogical(op) + '\n');
+    // if (op.type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN) {
+    //     auto& join = op.Cast<LogicalComparisonJoin>();
+    //     DUCKDB_GRAPHAR_LOG_DEBUG("LJ:\n" + GetInfoLogicalJoin(join));
+    //     DUCKDB_GRAPHAR_LOG_DEBUG("CJ:\n" + GetInfoComparisonJoin(join));
+    // }
+    // if (op.type == LogicalOperatorType::LOGICAL_GET) {
+    //     auto& get = op.Cast<LogicalGet>();
+    //     DUCKDB_GRAPHAR_LOG_DEBUG("LG:\n" + GetInfoLogicalGet(get));
+    // }
     for (auto& child : op.children) {
         if (child) {
-            LoggingWalk(*child);
+            LoggingWalk(*child, ++lo_i);
         }
     }
+}
+
+static void LoggingWalk(LogicalOperator& op) { 
+    size_t lo_i = 0;
+    LoggingWalk(op, lo_i);
 }
 
 static void GraphArPreOptimize(OptimizerExtensionInput& input, unique_ptr<LogicalOperator>& plan) {
@@ -431,9 +438,12 @@ static void GraphArOptimize(OptimizerExtensionInput& input, unique_ptr<LogicalOp
     const bool hasGraphArScan = HasGraphArScan(*plan);
 
     // DUCKDB_GRAPHAR_LOG_DEBUG("after depth: " + std::to_string(GetOperatorTree(*plan)))
-    // std::string tree;
-    // GetOperatorTree(*plan, tree);
-    // DUCKDB_GRAPHAR_LOG_DEBUG("after operators: " + tree);
+    std::string tree;
+    GetOperatorTree(*plan, tree);
+    DUCKDB_GRAPHAR_LOG_WARN("after operators: " + tree);
+    DUCKDB_GRAPHAR_LOG_WARN(plan->ToString());
+
+    LoggingWalk(*plan);
 
     bool use_optimize = GraphArSettings::use_optimize(input.context);
 
@@ -450,9 +460,12 @@ static void GraphArOptimize(OptimizerExtensionInput& input, unique_ptr<LogicalOp
             // LoggingWalk(*plan);
             // DUCKDB_GRAPHAR_LOG_DEBUG("ReplacedMap:\n" + map2str(replace_columns));
         }
-        // std::string tree;
-        // GetOperatorTree(*plan, tree);
-        // DUCKDB_GRAPHAR_LOG_DEBUG("FINAL PLAN\n" + tree);
+        DUCKDB_GRAPHAR_LOG_WARN("OPTIMIZED");
+        std::string tree;
+        GetOperatorTree(*plan, tree);
+        DUCKDB_GRAPHAR_LOG_WARN("FINAL PLAN\n" + tree);
+        DUCKDB_GRAPHAR_LOG_WARN(plan->ToString());
+        LoggingWalk(*plan);
     }
 }
 

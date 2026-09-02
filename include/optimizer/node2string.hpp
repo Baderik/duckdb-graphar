@@ -13,14 +13,24 @@
 #include "duckdb/planner/operator/logical_comparison_join.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
 #include "duckdb/planner/operator/logical_projection.hpp"
+#include "duckdb/planner/operator/logical_filter.hpp"
+#include "duckdb/planner/operator/logical_cteref.hpp"
+#include "duckdb/planner/operator/logical_materialized_cte.hpp"
 #include "utils/benchmark.hpp"
 #include "utils/global_log_manager.hpp"
 
 namespace duckdb {
 
+std::string GetStringE(const unique_ptr<Expression>& expr);
+
 std::string LogBound(BoundColumnRefExpression& expr) {
     string result;
     return ExpressionTypeToString(expr.GetExpressionType()) + ": " + expr.GetName() + " " + expr.binding.ToString();
+}
+
+std::string LogComparison(BoundComparisonExpression& expr) {
+    string result;
+    return ExpressionTypeToString(expr.GetExpressionType()) + ": <" + GetStringE(expr.left) + ">-<" + GetStringE(expr.right) + ">";
 }
 
 template <typename elT>
@@ -55,9 +65,9 @@ std::string GetStringE(const unique_ptr<Expression>& expr) {
             // 	break;
             case ExpressionClass::BOUND_COLUMN_REF:
                 return LogBound(expr->Cast<BoundColumnRefExpression>());
-            // case ExpressionClass::BOUND_COMPARISON:
-            // 	return LogBound(expr->Cast<BoundComparisonExpression>());
-            // 	break;
+            case ExpressionClass::BOUND_COMPARISON:
+            	return LogComparison(expr->Cast<BoundComparisonExpression>());
+            	break;
             // case ExpressionClass::BOUND_CONJUNCTION:
             // 	return LogBound(expr->Cast<BoundConjunctionExpression>());
             // 	break;
@@ -238,8 +248,58 @@ std::string GetInfoLogicalAggregate(LogicalAggregate& op) {
     return result;
 }
 
+std::string GetInfoCorrelatedColumns(CorrelatedColumns& cols) {
+    std::string result;
+    result += "Delim index: " + std::to_string(cols.GetDelimIndex()) + '\n';
+    result += "cols: size=" + std::to_string(cols.size()) + '\n';
+
+    for (const auto& col : cols) {
+        result += "Binding:" + col.binding.ToString() + ";Type:" + col.type.ToString() + ";Name:" + col.name + ";Depth:" + std::to_string(col.depth) + '\n';
+    }
+    return result;
+}
+
+std::string GetInfoLogicalCTE(LogicalCTE& op) {
+    std::string result;
+    result += "Name: " + op.ctename + '\n';
+    result += "Table index: " + std::to_string(op.table_index) + '\n';
+    result += "Column count: " + std::to_string(op.column_count) + '\n';
+    result += GetInfoCorrelatedColumns(op.correlated_columns);
+
+    return result;
+}
+
+std::string GetInfoLogicalMaterializedCTE(LogicalMaterializedCTE& op) {
+    std::string result;
+    const auto binds = op.GetColumnBindings();
+    result += "Bindings: size=" + std::to_string(binds.size()) + " " + op.ColumnBindingsToString(binds) + '\n';
+
+    return result;
+}
+
+std::string GetInfoLogicalFilter(LogicalFilter& op) {
+    std::string result;
+    result += "Projection_map: " + GetStringL<idx_t>(op.projection_map, [](const auto& el) { return std::to_string(el); }) + '\n';
+    auto binds = op.GetColumnBindings();
+    result += "Bindings: size=" + std::to_string(binds.size()) + " " + op.ColumnBindingsToString(binds) + '\n';
+
+    return result;
+}
+
+std::string GetInfoLogicalCteRef(LogicalCTERef& op) {
+    std::string result;
+    result += "Bound Columns: " + GetStringL<string>(op.bound_columns, [](const auto& el) { return el; }) + '\n';
+    result += "Table index: " + std::to_string(op.table_index) + '\n';
+    result += "CTE index: " + std::to_string(op.cte_index) + '\n';
+    result += "Chunk Types: " + GetStringL<LogicalType>(op.chunk_types, [](const auto& el) { return el.ToString(); }) + '\n';
+    result += "Correlated columns: " + std::to_string(op.correlated_columns) + '\n';
+    result += "Is recurring: " + std::to_string(op.is_recurring) + '\n';
+
+    return result;
+}
+
 std::string GetInfoLogical(LogicalOperator& op) {
-    std::string result = "LO:\n";
+    std::string result;
     result += GetInfoLogicalOperator(op) + '\n';
 
     switch (op.type) {
@@ -265,6 +325,28 @@ std::string GetInfoLogical(LogicalOperator& op) {
             result += GetInfoLogicalAggregate(agg);
             break;
         }
+        case LogicalOperatorType::LOGICAL_MATERIALIZED_CTE: {
+            auto& cte = op.Cast<LogicalCTE>();
+            result += GetInfoLogicalCTE(cte) + '\n';
+            auto& materialized_cte = op.Cast<LogicalMaterializedCTE>();
+            result += GetInfoLogicalMaterializedCTE(materialized_cte);
+            break;
+        }
+        case LogicalOperatorType::LOGICAL_FILTER: {
+            auto& filter = op.Cast<LogicalFilter>();
+            result += GetInfoLogicalFilter(filter);
+            break;
+        }
+        case LogicalOperatorType::LOGICAL_CTE_REF: {
+            auto& cteref = op.Cast<LogicalCTERef>();
+            result += GetInfoLogicalCteRef(cteref);
+            break;
+        }
+        // case LogicalOperatorType::LOGICAL_CROSS_PRODUCT: {
+        //     auto& cp = op.Cast<LogicalCrossProduct>();
+        //     // result += GetInfoLogicalMaterializedCTE(cte);
+        //     break;
+        // }
         default: {
             result += "Special operator";
             break;
