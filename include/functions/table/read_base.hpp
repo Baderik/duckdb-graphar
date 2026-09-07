@@ -12,6 +12,7 @@
 #include <arrow/c/bridge.h>
 
 #include <duckdb/common/named_parameter_map.hpp>
+#include <duckdb/execution/expression_executor.hpp>
 #include <duckdb/function/table/arrow.hpp>
 #include <duckdb/function/table_function.hpp>
 #include <duckdb/main/extension/extension_loader.hpp>
@@ -22,7 +23,6 @@
 #include <duckdb/planner/expression/bound_function_expression.hpp>
 #include <duckdb/planner/expression/bound_operator_expression.hpp>
 #include <duckdb/storage/statistics/numeric_stats.hpp>
-#include <duckdb/execution/expression_executor.hpp>
 
 #include <graphar/api/arrow_reader.h>
 #include <graphar/api/high_level_reader.h>
@@ -892,17 +892,16 @@ public:
             if (BoundComparisonExpression::IsComparison(*filter)) {
                 auto& comparison = filter->Cast<BoundFunctionExpression>();
                 if (comparison.GetExpressionType() == ExpressionType::COMPARE_EQUAL) {
-                    auto &left = BoundComparisonExpression::Left(comparison);
-                    auto &right = BoundComparisonExpression::Right(comparison);
+                    auto& left = BoundComparisonExpression::Left(comparison);
+                    auto& right = BoundComparisonExpression::Right(comparison);
                     bool left_is_scalar = left.IsFoldable();
                     bool right_is_scalar = right.IsFoldable();
                     if (left_is_scalar || right_is_scalar) {
                         auto column_name = left.ToString();
                         Value val;
 
-                        auto& scalar_expr = (left.GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF)
-                                                ? right
-                                                : left;
+                        auto& scalar_expr =
+                            (left.GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF) ? right : left;
 
                         if (!ExpressionExecutor::TryEvaluateScalar(context, scalar_expr, val)) {
                             continue;
@@ -922,9 +921,8 @@ public:
                 const auto& fname = op_expr.Function().GetName();
                 if (fname == "contains" || fname == "list_contains" || fname == "array_contains" ||
                     fname == "list_has" || fname == "array_has") {
-                    auto &children = op_expr.GetChildren();
-                    if (children.size() == 2 &&
-                        children[0]->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
+                    auto& children = op_expr.GetChildren();
+                    if (children.size() == 2 && children[0]->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
                         auto& const_expr = children[0]->Cast<BoundConstantExpression>();
                         auto column_name = children[1]->ToString();
                         auto& list_value = const_expr.GetValue();
@@ -948,7 +946,7 @@ public:
             if (!can_pushdown && filter->GetExpressionClass() == ExpressionClass::BOUND_OPERATOR &&
                 filter->GetExpressionType() == ExpressionType::COMPARE_IN) {
                 auto& op_expr = filter->Cast<BoundOperatorExpression>();
-                auto &children = op_expr.GetChildren();
+                auto& children = op_expr.GetChildren();
                 if (children[0]->GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF) {
                     auto column_name = children[0]->ToString();
                     bool any = false;
@@ -973,8 +971,8 @@ public:
                 std::string column_name;
                 std::vector<Value> local_vals;
                 bool valid = true;
-                
-                auto &children = conj.GetChildren();
+
+                auto& children = conj.GetChildren();
                 for (auto& child : children) {
                     if (BoundComparisonExpression::IsComparison(*child) ||
                         child->GetExpressionType() != ExpressionType::COMPARE_EQUAL) {
@@ -984,8 +982,8 @@ public:
                     auto& cmp = filter->Cast<BoundFunctionExpression>();
                     std::string col;
                     Value val;
-                    auto &left = BoundComparisonExpression::Left(cmp);
-                    auto &right = BoundComparisonExpression::Right(cmp);
+                    auto& left = BoundComparisonExpression::Left(cmp);
+                    auto& right = BoundComparisonExpression::Right(cmp);
                     if (left.GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF &&
                         right.GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
                         col = left.ToString();

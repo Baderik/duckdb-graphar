@@ -153,11 +153,9 @@
 
 //     graphar::IdType offset_chunk_index = start / vertex_chunk_size;
 //     graphar::IdType offset_in_file = start % vertex_chunk_size;
-//     GAR_ASSIGN_OR_RAISE(auto offset_file_path, edge_info->GetAdjListOffsetFilePath(offset_chunk_index, adj_list_type));
-//     std::string out_prefix;
-//     GAR_ASSIGN_OR_RAISE(auto fs, graphar::FileSystemFromUriOrPath(prefix, &out_prefix));
-//     auto adjacent_list = edge_info->GetAdjacentList(adj_list_type);
-//     if (adjacent_list == nullptr) {
+//     GAR_ASSIGN_OR_RAISE(auto offset_file_path, edge_info->GetAdjListOffsetFilePath(offset_chunk_index,
+//     adj_list_type)); std::string out_prefix; GAR_ASSIGN_OR_RAISE(auto fs, graphar::FileSystemFromUriOrPath(prefix,
+//     &out_prefix)); auto adjacent_list = edge_info->GetAdjacentList(adj_list_type); if (adjacent_list == nullptr) {
 //         return graphar::Status::Invalid("The adjacent list is not set for adj list type ",
 //                                         std::string(AdjListTypeToString(adj_list_type)));
 //     }

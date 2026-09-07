@@ -121,7 +121,8 @@
 //     return std::move(bind_data);
 // }
 
-// unique_ptr<GlobalTableFunctionState> ShortestPath::InitGlobal(ClientContext& context, TableFunctionInitInput& input) {
+// unique_ptr<GlobalTableFunctionState> ShortestPath::InitGlobal(ClientContext& context, TableFunctionInitInput& input)
+// {
 //     DUCKDB_GRAPHAR_LOG_TRACE("ShortestPath::InitGlobal");
 
 //     auto global_state = make_uniq<ShortestPathGlobalState>();
@@ -198,7 +199,8 @@
 //                 q_forward.pop();
 
 //                 // Use find_src to get iterator for edges from curr
-//                 auto forward_iter = global_state->forward_edges->find_src(curr, global_state->forward_edges->begin());
+//                 auto forward_iter = global_state->forward_edges->find_src(curr,
+//                 global_state->forward_edges->begin());
 
 //                 if (forward_iter != global_state->forward_edges->end()) {
 //                     do {
