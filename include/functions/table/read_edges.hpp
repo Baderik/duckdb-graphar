@@ -38,6 +38,6 @@ public:
     static TableFunction GetFunction();
     static TableFunction GetScanFunction();
 
-    static std::string GetFunctionName() { return "read_edges"; }
+    static Identifier GetFunctionName() { return Identifier("read_edges"); }
 };
 }  // namespace duckdb

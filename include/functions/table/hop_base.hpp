@@ -131,11 +131,11 @@ public:
         if (catalog_entry != input.named_parameters.end()) {
             catalog_name = StringValue::Get(catalog_entry->second);
         }
-        auto& catalog = Catalog::GetCatalog(context, catalog_name);
+        auto& catalog = Catalog::GetCatalog(context, Identifier(catalog_name));
         if (catalog.GetCatalogType() != GraphArCatalog::TYPE) {
             throw BinderException("Expecting a GraphAr catalog, but got %s", catalog.GetCatalogType());
         }
-        bind_data.catalog_name = catalog.GetName();
+        bind_data.catalog_name = catalog.GetName().GetIdentifierName();
 
         auto& graphar_catalog = catalog.Cast<GraphArCatalog>();
         bind_data.graph_info = graphar_catalog.GetGraphInfo();

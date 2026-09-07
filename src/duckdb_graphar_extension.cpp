@@ -54,12 +54,12 @@ static void LoadInternal(ExtensionLoader& loader) {
 
     ReadVertices::Register(loader);
     ReadEdges::Register(loader);
-    EdgesVertex::Register(loader);
+    // EdgesVertex::Register(loader);
     TwoHop::Register(loader);
     ReadHop::Register(loader);
     ReadHopFiltered::Register(loader);
     GraphArInfo::Register(loader);
-    ShortestPath::Register(loader);
+    // ShortestPath::Register(loader);
 
     StorageExtension::Register(config, "duckdb_graphar", make_shared_ptr<GraphArStorageExtension>());
 }

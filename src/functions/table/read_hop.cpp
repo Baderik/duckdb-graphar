@@ -45,7 +45,7 @@ unique_ptr<FunctionData> ReadHop::Bind(ClientContext& context, TableFunctionBind
     auto graph_info = bind_data->graph_info;
     auto edge_info = bind_data->edge_info;
     unique_ptr<ReadBindData> base_bind_data = std::move(bind_data);
-    ReadBase::SetBindData(graph_info, edge_info, base_bind_data, GetFunctionName(), 0, 1,
+    ReadBase::SetBindData(graph_info, edge_info, base_bind_data, GetFunctionName().GetIdentifierName(), 0, 1,
                           {SRC_GID_COLUMN, DST_GID_COLUMN});
     bind_data.reset(static_cast<ReadHopBindData*>(base_bind_data.release()));
 
@@ -254,7 +254,7 @@ void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChu
         }
     }
 
-    output.SetCapacity(num_rows);
+    // output.SetCapacity(num_rows);
     output.SetCardinality(num_rows);
     gstate.total_rows += num_rows;
     gstate.chunk_count++;

@@ -77,7 +77,7 @@ public:
     }
     static void Register(ExtensionLoader& loader) { loader.RegisterFunction(GetFunctions()); }
 
-    static std::string GetFunctionName() { return "two_hop"; }
+    static Identifier GetFunctionName() { return Identifier("two_hop"); }
 };
 
 }  // namespace duckdb

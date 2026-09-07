@@ -43,7 +43,7 @@ void GraphArInfo::Execute(ClientContext& context, TableFunctionInput& data_p, Da
 }
 
 TableFunctionSet GraphArInfo::GetFunctions() {
-    TableFunction information_f = TableFunction("graphar_info", {}, Execute, Bind, Init);
+    TableFunction information_f = TableFunction(Identifier("graphar_info"), {}, Execute, Bind, Init);
     return TableFunctionSet(information_f);
 }
 

@@ -97,6 +97,6 @@ public:
     static idx_t FetchRowsNum(ReadHopFilteredGlobalTableFunctionState& gstate,
                               ReadHopFilteredLocalTableFunctionState& lstate);
 
-    static std::string GetFunctionName() { return "read_hop_filtered"; }
+    static Identifier GetFunctionName() { return Identifier("read_hop_filtered"); }
 };
 }  // namespace duckdb
