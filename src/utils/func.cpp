@@ -22,6 +22,7 @@ namespace duckdb {
 
 LogicalTypeId GraphArFunctions::graphArT2duckT(const std::string& name) {
     if (name == "bool") return LogicalTypeId::BOOLEAN;
+    if (name == "int16") return LogicalTypeId::SMALLINT;
     if (name == "int32") return LogicalTypeId::INTEGER;
     if (name == "int64") return LogicalTypeId::BIGINT;
     if (name == "float") return LogicalTypeId::FLOAT;
@@ -36,6 +37,7 @@ LogicalTypeId GraphArFunctions::graphArT2duckT(const std::string& name) {
 
 std::shared_ptr<arrow::DataType> GraphArFunctions::graphArT2arrowT(const std::string& name) {
     if (name == "bool") return arrow::boolean();
+    if (name == "int16") return arrow::int16();
     if (name == "int32") return arrow::int32();
     if (name == "int64") return arrow::int64();
     if (name == "float") return arrow::float32();
@@ -63,6 +65,8 @@ Value GraphArFunctions::ArrowScalar2DuckValue(const std::shared_ptr<arrow::Scala
     switch (scalar->type->id()) {
         case arrow::Type::BOOL:
             return Value::BOOLEAN(static_cast<const arrow::BooleanScalar&>(*scalar).value);
+        case arrow::Type::INT16:
+            return Value::SMALLINT(static_cast<const arrow::Int16Scalar&>(*scalar).value);
         case arrow::Type::INT32:
             return Value::INTEGER(static_cast<const arrow::Int32Scalar&>(*scalar).value);
         case arrow::Type::INT64:
@@ -126,6 +130,16 @@ std::shared_ptr<arrow::Table> GraphArFunctions::EmptyTableFromNamesAndTypes(cons
 std::shared_ptr<graphar::Expression> GraphArFunctions::GetFilter(const std::string& filter_type,
                                                                  const std::string& filter_value,
                                                                  const std::string& filter_column) {
+    if (filter_type == "bool") {
+        if (filter_value != "true" && filter_value != "false") {
+            throw InvalidInputException("Invalid boolean filter value: %s", filter_value);
+        }
+        return graphar::_Equal(graphar::_Property(filter_column), graphar::_Literal(filter_value == "true"));
+    }
+    // Note: graphar::_Literal has no int16 overload, so we promote to int32.
+    if (filter_type == "int16") {
+        return graphar::_Equal(graphar::_Property(filter_column), graphar::_Literal(std::stoi(filter_value)));
+    }
     if (filter_type == "int32") {
         return graphar::_Equal(graphar::_Property(filter_column), graphar::_Literal(std::stoi(filter_value)));
     }
@@ -144,7 +158,6 @@ std::shared_ptr<graphar::Expression> GraphArFunctions::GetFilter(const std::stri
     if (filter_type == "double") {
         return graphar::_Equal(graphar::_Property(filter_column), graphar::_Literal(std::stod(filter_value)));
     }
-    // TODO: bool?
 
     throw NotImplementedException("Unsupported filter type: " + filter_type);
 }
@@ -179,7 +192,6 @@ void ConvertArrowTableToDataChunk(const arrow::Table& table, DataChunk& output, 
     }
 
     const auto num_rows = table.num_rows();
-    output.SetCapacity(num_rows);
     output.SetCardinality(num_rows);
     for (idx_t col_idx = 0; col_idx < column_ids.size(); col_idx++) {
         auto& arrow_type = *arrow_table_schema.GetColumns().at(column_ids[col_idx]);

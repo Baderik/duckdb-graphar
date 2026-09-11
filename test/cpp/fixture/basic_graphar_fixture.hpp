@@ -9,6 +9,10 @@
 #include <graphar/graph_info.h>
 #include <graphar/status.h>
 
+#include <arrow/api.h>
+#include <arrow/table.h>
+#include <arrow/compute/api.h>
+
 
 #include <cassert>
 #include <iostream>
@@ -320,14 +324,92 @@ protected:
         for (auto ind_e = 0; ind_e < edges_list.size(); ++ind_e){
             const auto& edges_schema = edges_list[ind_e];
             auto num_vertices = edges_schema.num_vertices;
+
+            // Build an Arrow table holding the edge properties. In the new
+            // GraphAr EdgesBuilder API, edges carry only (src, dst, row) and the
+            // property values are taken from an external Arrow table at Dump()
+            // time, keyed by the edge's row index. The table must contain one
+            // column per edge property.
+            std::vector<std::shared_ptr<arrow::Field>> prop_fields;
+            std::vector<std::shared_ptr<arrow::Array>> prop_arrays;
+            for (const auto& prop_schema : edges_schema.properties) {
+                auto arrow_type = graphar::DataType::DataTypeToArrowDataType(
+                    graphar::DataType::TypeNameToDataType(prop_schema.data_type));
+                prop_fields.push_back(arrow::field(prop_schema.name, arrow_type));
+
+                if (prop_schema.data_type == "int32") {
+                    arrow::Int32Builder b;
+                    for (const auto& edge_data : edges_schema.edges) {
+                        b.Append(std::get<int32_t>(edge_data.properties.at(prop_schema.name)));
+                    }
+                    prop_arrays.push_back(b.Finish().ValueOrDie());
+                } else if (prop_schema.data_type == "int64") {
+                    arrow::Int64Builder b;
+                    for (const auto& edge_data : edges_schema.edges) {
+                        b.Append(std::get<int64_t>(edge_data.properties.at(prop_schema.name)));
+                    }
+                    prop_arrays.push_back(b.Finish().ValueOrDie());
+                } else if (prop_schema.data_type == "float") {
+                    arrow::FloatBuilder b;
+                    for (const auto& edge_data : edges_schema.edges) {
+                        b.Append(std::get<float>(edge_data.properties.at(prop_schema.name)));
+                    }
+                    prop_arrays.push_back(b.Finish().ValueOrDie());
+                } else if (prop_schema.data_type == "double") {
+                    arrow::DoubleBuilder b;
+                    for (const auto& edge_data : edges_schema.edges) {
+                        b.Append(std::get<double>(edge_data.properties.at(prop_schema.name)));
+                    }
+                    prop_arrays.push_back(b.Finish().ValueOrDie());
+                } else if (prop_schema.data_type == "string") {
+                    // GraphAr maps STRING -> arrow::large_utf8(), so the property
+                    // table must carry large_string arrays to match the schema that
+                    // EdgesBuilder::convertToTable declares. Using a plain
+                    // arrow::StringBuilder (utf8) here makes the table's buffers
+                    // inconsistent with its schema and the parquet writer rejects it.
+                    arrow::LargeStringBuilder b;
+                    for (const auto& edge_data : edges_schema.edges) {
+                        b.Append(std::get<std::string>(edge_data.properties.at(prop_schema.name)));
+                    }
+                    prop_arrays.push_back(b.Finish().ValueOrDie());
+                } else if (prop_schema.data_type == "bool") {
+                    arrow::BooleanBuilder b;
+                    for (const auto& edge_data : edges_schema.edges) {
+                        b.Append(std::get<bool>(edge_data.properties.at(prop_schema.name)));
+                    }
+                    prop_arrays.push_back(b.Finish().ValueOrDie());
+                } else {
+                    throw std::runtime_error("Unsupported data type: " + prop_schema.data_type);
+                }
+            }
+            auto prop_schema_ptr = std::make_shared<arrow::Schema>(prop_fields);
+            auto prop_table = arrow::Table::Make(prop_schema_ptr, prop_arrays,
+                                                 edges_schema.edges.size());
+
             for (const auto& adjacent_type : adjacent_types){
                 auto e_builder = graphar::builder::EdgesBuilder::Make(edges_infos[ind_e], output_path, adjacent_type, num_vertices).value();
+                // Add edges with their row index so Dump() can fetch the
+                // corresponding property values from prop_table.
+                size_t row = 0;
                 for (const auto& edge_data : edges_schema.edges) {
-                    auto edge = graphar::builder::Edge(edge_data.src, edge_data.dst);
-                    FillProperties<graphar::builder::Edge>(edge, edges_schema.properties, edge_data.properties);
+                    auto edge = graphar::builder::Edge(edge_data.src, edge_data.dst, row);
                     REQUIRE(e_builder->AddEdge(edge).ok());
+                    ++row;
                 }
-                REQUIRE(e_builder->Dump().ok());
+                // Dump each vertex chunk separately (the new API expects one
+                // chunk per Dump() call). All edges in these small graphs live
+                // in chunk 0.
+                auto dump_st = e_builder->Dump(0, prop_table);
+                if (!dump_st.ok()) {
+                    std::cerr << "EdgesBuilder::Dump failed for adj type "
+                              << (adjacent_type == graphar::AdjListType::ordered_by_source
+                                      ? "ordered_by_source"
+                                      : "ordered_by_dest")
+                              << " graph=" << graph_name << " props="
+                              << edges_schema.properties.size()
+                              << " msg=" << dump_st.message() << std::endl;
+                }
+                REQUIRE(dump_st.ok());
             }
         }   
 
@@ -337,8 +419,13 @@ protected:
 public:
     BasicGrapharFixture(): tmp_folder(std::filesystem::temp_directory_path() / "duckdb_graphar/data/"), db(nullptr), conn(db) {};
     ~BasicGrapharFixture(){
-        for (const auto& graph_folder : graph_folders){
-            REQUIRE_NOTHROW(std::filesystem::remove_all(graph_folder));
+        // Clean up temporary graph folders created during the test. We use the
+        // non-throwing std::filesystem overloads (std::error_code) so that a
+        // cleanup failure does not throw from within a destructor (which would
+        // otherwise trigger std::terminate).
+        for (const auto& graph_folder : graph_folders) {
+            std::error_code ec;
+            std::filesystem::remove_all(graph_folder, ec);
         }
     }
 };

@@ -42,16 +42,16 @@ static bool IsGraphArScan(const LogicalOperator& op) {
 }
 
 static pair<ColumnBinding, ColumnBinding> GetReplaceBinding(const JoinCondition& condition, const idx_t vertex_table) {
-    if (condition.left->type != ExpressionType::BOUND_COLUMN_REF ||
-        condition.right->type != ExpressionType::BOUND_COLUMN_REF) {
+    if (condition.GetLHS().GetExpressionType() != ExpressionType::BOUND_COLUMN_REF ||
+        condition.GetRHS().GetExpressionType() != ExpressionType::BOUND_COLUMN_REF) {
         throw InternalException("invalid join condition types");
     }
-    auto& left = condition.left->Cast<BoundColumnRefExpression>();
-    auto& right = condition.right->Cast<BoundColumnRefExpression>();
-    if (left.binding.table_index == vertex_table) {
-        return {left.binding, right.binding};
-    } else if (right.binding.table_index == vertex_table) {
-        return {right.binding, left.binding};
+    auto& left = condition.GetLHS().Cast<BoundColumnRefExpression>();
+    auto& right = condition.GetRHS().Cast<BoundColumnRefExpression>();
+    if (left.Binding().table_index.index == vertex_table) {
+        return {left.Binding(), right.Binding()};
+    } else if (right.Binding().table_index.index == vertex_table) {
+        return {right.Binding(), left.Binding()};
     } else {
         throw InternalException("invalid join condition table indexes");
     }
@@ -63,21 +63,21 @@ static void replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_co
         case LogicalOperatorType::LOGICAL_COMPARISON_JOIN: {
             auto& join = op->Cast<LogicalComparisonJoin>();
             for (auto& condition : join.conditions) {
-                if (condition.left->type == ExpressionType::BOUND_COLUMN_REF) {
-                    auto& col = condition.left->Cast<BoundColumnRefExpression>();
+                if (condition.GetLHS().GetExpressionType() == ExpressionType::BOUND_COLUMN_REF) {
+                    auto& col = condition.GetLHS().Cast<BoundColumnRefExpression>();
 
-                    auto it = replace_columns.find(col.binding.ToString());
+                    auto it = replace_columns.find(col.Binding().ToString());
                     while (it != replace_columns.end()) {
-                        col.binding = it->second;
-                        it = replace_columns.find(col.binding.ToString());
+                        col.BindingMutable() = it->second;
+                        it = replace_columns.find(col.Binding().ToString());
                     }
                 }
-                if (condition.right->type == ExpressionType::BOUND_COLUMN_REF) {
-                    auto& col = condition.right->Cast<BoundColumnRefExpression>();
-                    auto it = replace_columns.find(col.binding.ToString());
+                if (condition.GetRHS().GetExpressionType() == ExpressionType::BOUND_COLUMN_REF) {
+                    auto& col = condition.GetRHS().Cast<BoundColumnRefExpression>();
+                    auto it = replace_columns.find(col.Binding().ToString());
                     while (it != replace_columns.end()) {
-                        col.binding = it->second;
-                        it = replace_columns.find(col.binding.ToString());
+                        col.BindingMutable() = it->second;
+                        it = replace_columns.find(col.Binding().ToString());
                     }
                 }
             }
@@ -91,13 +91,13 @@ static void replaceColumnsInOperator(unique_ptr<LogicalOperator>& op, replace_co
                     DUCKDB_GRAPHAR_LOG_WARN("replace exp = nullptr");
                     continue;
                 }
-                switch (exp->type) {
+                switch (exp->GetExpressionType()) {
                     case (ExpressionType::BOUND_COLUMN_REF):
                         auto& col = exp->Cast<BoundColumnRefExpression>();
-                        auto it = replace_columns.find(col.binding.ToString());
+                        auto it = replace_columns.find(col.Binding().ToString());
                         while (it != replace_columns.end()) {
-                            col.binding = it->second;
-                            it = replace_columns.find(col.binding.ToString());
+                            col.BindingMutable() = it->second;
+                            it = replace_columns.find(col.Binding().ToString());
                         }
                         break;
                 }
@@ -115,15 +115,15 @@ static void useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
             const auto& join = op.Cast<LogicalComparisonJoin>();
             // DUCKDB_GRAPHAR_LOG_TRACE("Cast");
             for (const auto& condition : join.conditions) {
-                if (condition.left->type == ExpressionType::BOUND_COLUMN_REF) {
-                    const auto& col = condition.left->Cast<BoundColumnRefExpression>();
+                if (condition.GetLHS().GetExpressionType() == ExpressionType::BOUND_COLUMN_REF) {
+                    const auto& col = condition.GetLHS().Cast<BoundColumnRefExpression>();
 
-                    used_columns[col.binding.table_index].emplace(col.binding.column_index);
+                    used_columns[col.Binding().table_index.index].emplace(col.Binding().column_index.GetIndex());
                 }
-                if (condition.right->type == ExpressionType::BOUND_COLUMN_REF) {
-                    const auto& col = condition.right->Cast<BoundColumnRefExpression>();
+                if (condition.GetRHS().GetExpressionType() == ExpressionType::BOUND_COLUMN_REF) {
+                    const auto& col = condition.GetRHS().Cast<BoundColumnRefExpression>();
 
-                    used_columns[col.binding.table_index].emplace(col.binding.column_index);
+                    used_columns[col.Binding().table_index.index].emplace(col.Binding().column_index.GetIndex());
                 }
             }
             break;
@@ -141,12 +141,12 @@ static void useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
                     DUCKDB_GRAPHAR_LOG_WARN("use exp = nullptr");
                     continue;
                 }
-                switch (exp->type) {
+                switch (exp->GetExpressionType()) {
                     case (ExpressionType::BOUND_COLUMN_REF):
                         // DUCKDB_GRAPHAR_LOG_TRACE("E BOUND_COLUMN_REF");
                         const auto& col = exp->Cast<BoundColumnRefExpression>();
 
-                        used_columns[col.binding.table_index].emplace(col.binding.column_index);
+                        used_columns[col.Binding().table_index.index].emplace(col.Binding().column_index.GetIndex());
                         break;
                 }
             }
@@ -160,7 +160,7 @@ static bool checkVertexTable(const LogicalOperator& op, using_col_set& used_colu
     if (get.function.name != "read_vertices") {
         return false;
     }
-    const auto t_idx = get.table_index;
+    const auto t_idx = get.table_index.index;
     auto it = used_columns.find(t_idx);
     if (it == used_columns.end()) {
         return false; // TODO: must be true - unused vertex table so can be skipped, no?
@@ -225,13 +225,13 @@ static OptimizeResult TryOptimizeVertexEdgeJoin(unique_ptr<LogicalOperator>& op,
         if (vertex_binds.size() != 1) {
             return result;
         }
-        vertex_table = vertex_binds[0].table_index;
+        vertex_table = vertex_binds[0].table_index.index;
     } else {
         auto vertex_binds = left->GetColumnBindings();
         if (vertex_binds.size() != 1) {
             return result;
         }
-        vertex_table = vertex_binds[0].table_index;
+        vertex_table = vertex_binds[0].table_index.index;
     }
     if (join.conditions.size() != 1) {
         return result;
@@ -305,21 +305,21 @@ static OptimizeResult OptimizeJoins(unique_ptr<LogicalOperator>& op, replace_col
                 if (child_i == 0) {
                     if (join.left_projection_map.empty()) {
                         for (auto& index : child_result.new_indexes) {
-                            join.left_projection_map.push_back(index);
+                            join.left_projection_map.push_back(ProjectionIndex(index));
                         }
                     } else {
                         for (auto& index : join.left_projection_map) {
-                            index = child_result.new_indexes[index];
+                            index = ProjectionIndex(child_result.new_indexes[index]);
                         }
                     }
                 } else {
                     if (join.right_projection_map.empty()) {
                         for (auto& index : child_result.new_indexes) {
-                            join.right_projection_map.push_back(index);
+                            join.right_projection_map.push_back(ProjectionIndex(index));
                         }
                     } else {
                         for (auto& index : join.right_projection_map) {
-                            index = child_result.new_indexes[index];
+                            index = ProjectionIndex(child_result.new_indexes[index]);
                         }
                     }
                 }

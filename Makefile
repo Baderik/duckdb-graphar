@@ -1,6 +1,10 @@
 export CMAKE_POLICY_VERSION_MINIMUM=3.5
 PROJ_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
+# cmake --build uses make's -j (deferred eval: MAKEFLAGS is set at run time).
+MAKE_JOBS = $(if $(shell echo "$(MAKEFLAGS)" | sed -n 's/.*-j *\([0-9][0-9]*\).*/\1/p' | head -1),$(shell echo "$(MAKEFLAGS)" | sed -n 's/.*-j *\([0-9][0-9]*\).*/\1/p' | head -1),$(shell getconf _NPROCESSORS_ONLN))
+export CMAKE_BUILD_PARALLEL_LEVEL = $(MAKE_JOBS)
+
 # Configuration of extension
 EXT_NAME=graphar_duck
 EXT_CONFIG=${PROJ_DIR}extension_config.cmake
@@ -9,7 +13,7 @@ THIRD_PARTY_DIR=$(PROJ_DIR)third_party
 THIRD_PARTY_CMAKE=$(PROJ_DIR)third_party/extension_deps.cmake
 
 ARROW_REP=https://github.com/apache/arrow.git
-ARROW_VERSION=19.0.1
+ARROW_VERSION=23.0.0
 ARROW_DIR=$(THIRD_PARTY_DIR)/arrow
 ARROW_INSTALL_DIR=$(ARROW_DIR)/install
 ARROW_SRC_DIR=$(ARROW_DIR)/src
@@ -19,7 +23,7 @@ ARROW_BUILT = $(ARROW_DIR)/.built
 ARROW_INSTALLED = $(ARROW_DIR)/.installed
 
 GRAPHAR_REP=https://github.com/lithium-tech/incubator-graphar.git
-GRAPHAR_COMMIT=2fc1fcf2faed6259a72fb47f14585a09cd162f32
+GRAPHAR_COMMIT=8a4c3c9633b5e130812c5cb79171beebdcc4ad42
 GRAPHAR_DIR=$(THIRD_PARTY_DIR)/graphar
 GRAPHAR_INSTALL_DIR=$(GRAPHAR_DIR)/install
 GRAPHAR_SRC_DIR=$(GRAPHAR_DIR)/src
@@ -33,6 +37,45 @@ GRAPHAR_ROOT=$(GRAPHAR_INSTALL_DIR)
 
 # Include the Makefile from extension-ci-tools
 include extension-ci-tools/makefiles/duckdb_extension.Makefile
+
+# Two test suites: SQL (test/sql/, via DuckDB's `unittest`) and C++ unit tests
+# (test/cpp/, own binary `unittest_graphar`). Both are built by default.
+EXT_RELEASE_FLAGS += -DBUILD_EXTENSION_UNIT_TESTS=ON -DBUILD_UNITTESTS=TRUE
+EXT_DEBUG_FLAGS += -DBUILD_EXTENSION_UNIT_TESTS=ON -DBUILD_UNITTESTS=TRUE
+
+# `make test` runs both suites (overrides extension-ci-tools' generic runner).
+.PHONY: test_release_internal test_debug_internal test_reldebug_internal
+test_release_internal:
+	$(MAKE) test-sql-release
+	$(MAKE) test-unit-release
+
+test_debug_internal:
+	$(MAKE) test-sql-debug
+	$(MAKE) test-unit-debug
+
+test_reldebug_internal:
+	$(MAKE) test-sql-reldebug
+	$(MAKE) test-unit-reldebug
+
+# SQL tests via DuckDB's own unittest binary.
+.PHONY: test-sql test-sql-release test-sql-debug test-sql-reldebug
+test-sql: test-sql-release
+test-sql-release:
+	./build/release/test/unittest "[graphar]"
+test-sql-debug:
+	./build/debug/test/unittest "[graphar]"
+test-sql-reldebug:
+	./build/reldebug/test/unittest "[graphar]"
+
+# C++ unit tests of the extension.
+.PHONY: test-unit test-unit-release test-unit-debug test-unit-reldebug
+test-unit: test-unit-release
+test-unit-release:
+	./build/release/extension/duckdb_graphar/test/cpp/unittest_graphar
+test-unit-debug:
+	./build/debug/extension/duckdb_graphar/test/cpp/unittest_graphar
+test-unit-reldebug:
+	./build/reldebug/extension/duckdb_graphar/test/cpp/unittest_graphar
 
 $(ARROW_CLONED):
 	@echo "Clone Apache Arrow"
@@ -119,5 +162,21 @@ $(THIRD_PARTY_CMAKE): $(ARROW_INSTALLED) $(GRAPHAR_INSTALLED)
 	@echo 'set(GRAPHAR_ROOT "$(GRAPHAR_ROOT)" CACHE PATH "Path to GraphAr")' >> $(THIRD_PARTY_CMAKE)
 
 configure_ci: $(THIRD_PARTY_CMAKE)
-release: $(THIRD_PARTY_CMAKE)
-debug: $(THIRD_PARTY_CMAKE)
+
+# Override extension-ci-tools' release/debug. We configure only once (guarded
+# by the CMakeCache) to avoid a forced full recompile, but always re-run cmake
+# on an existing build so CMake performs an incremental configure and refreshes
+# the ever-changing EXTENSION_GIT_COMMIT_HASH / EXTENSION_BUILD_TIMESTAMP when
+# new sources are picked up.
+.PHONY: release debug
+release: $(THIRD_PARTY_CMAKE) $(EXTENSION_CONFIG_STEP)
+	mkdir -p build/release
+	@test -f build/release/CMakeCache.txt || cmake $(GENERATOR) $(BUILD_FLAGS) $(EXT_RELEASE_FLAGS) $(VCPKG_MANIFEST_FLAGS) -DCMAKE_BUILD_TYPE=Release -S $(DUCKDB_SRCDIR) -B build/release
+	cmake -S $(DUCKDB_SRCDIR) -B build/release
+	cmake --build build/release --config Release
+
+debug: $(THIRD_PARTY_CMAKE) $(EXTENSION_CONFIG_STEP)
+	mkdir -p build/debug
+	@test -f build/debug/CMakeCache.txt || cmake $(GENERATOR) $(BUILD_FLAGS) $(EXT_DEBUG_FLAGS) $(VCPKG_MANIFEST_FLAGS) -DCMAKE_BUILD_TYPE=Debug -S $(DUCKDB_SRCDIR) -B build/debug
+	cmake -S $(DUCKDB_SRCDIR) -B build/debug
+	cmake --build build/debug --config Debug

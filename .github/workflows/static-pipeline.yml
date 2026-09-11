@@ -116,7 +116,7 @@ jobs:
       - name: Set up DuckDB
         id: duckdb-version
         run: |
-          git submodule update --init --remote duckdb
+          git submodule update --init duckdb
           cd duckdb
           git fetch --tags origin
           cd ..
@@ -126,7 +126,19 @@ jobs:
       - name: Build
         run: |
           make release
- 
+
+      - name: Install GraphAr CLI and Generate Data
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          pip3 install --upgrade pip
+          ./scripts/install-cli.sh || exit 1
+          ./scripts/generate-graphar-data.sh || exit 1
+
+      - name: Run tests
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          make test
+
       - name: Prepare Artifacts for Upload
         run: |
           mkdir -p upload-artifacts

@@ -31,7 +31,13 @@ string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d %H:%M:%S%z")
 
 # Add compile definitions for version information
 add_definitions(-DEXTENSION_GIT_COMMIT_HASH="${EXTENSION_GIT_COMMIT_HASH}")
-add_definitions(-DEXTENSION_BUILD_TIMESTAMP="${BUILD_TIMESTAMP}")
+
+# Only graphar_info.cpp exposes build metadata, so scope the ever-changing
+# timestamp to that file; a global define would recompile every source on
+# each configure.
+set_source_files_properties(
+    ${EXTENSION_ROOT_DIR}/src/functions/table/graphar_info.cpp
+    PROPERTIES COMPILE_DEFINITIONS EXTENSION_BUILD_TIMESTAMP="${BUILD_TIMESTAMP}")
 
 # Print version information during configuration
 message(STATUS "Extension Git Commit: ${EXTENSION_GIT_COMMIT_HASH}")
@@ -70,6 +76,18 @@ find_package(Parquet REQUIRED CONFIG)
 
 find_package(graphar REQUIRED CONFIG)
 
+# GraphAr's target carries `-Wl,--exclude-libs,ALL`, which would hide the
+# generated-extension-loader symbols in libduckdb.so that `unittest` needs to
+# run the SQL tests; strip just that flag (Arrow/Parquet linkage is unaffected).
+if(TARGET graphar)
+    get_target_property(_gar_link_libs graphar INTERFACE_LINK_LIBRARIES)
+    if(_gar_link_libs)
+        list(REMOVE_ITEM _gar_link_libs "-Wl,--exclude-libs,ALL")
+        set_target_properties(graphar PROPERTIES INTERFACE_LINK_LIBRARIES "${_gar_link_libs}")
+    endif()
+    unset(_gar_link_libs)
+endif()
+
 include_directories(include)
 
 # Add mini-yaml include path from GraphAr source
@@ -98,3 +116,23 @@ install(TARGETS ${EXTENSION_NAME}
         EXPORT "${DUCKDB_EXPORT_SET}"
         LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
         ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")
+
+# C++ unit tests (test/cpp/, own Catch2 binary `unittest_graphar`).
+option(BUILD_EXTENSION_UNIT_TESTS "Build the extension's C++ unit-test binary (test/cpp/)" OFF)
+if(BUILD_EXTENSION_UNIT_TESTS)
+    # Arrow / GraphAr install roots come from the Makefile-provided ARROW_ROOT /
+    # GRAPHAR_ROOT (also consumed via find_package above).
+    if(NOT DEFINED ARROW_ROOT)
+        set(ARROW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/arrow/install")
+    endif()
+    if(NOT DEFINED GRAPHAR_ROOT)
+        set(GRAPHAR_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/graphar/install")
+    endif()
+    set(ARROW_INSTALL_DIR "${ARROW_ROOT}")
+    set(GRAPHAR_INSTALL_DIR "${GRAPHAR_ROOT}")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/graphar/src/cpp/thirdparty")
+        set(GRAPHAR_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/graphar/src")
+    endif()
+
+    add_subdirectory(test/cpp test/cpp)
+endif()

@@ -1,18 +1,14 @@
-# Testing this extension
-This directory contains all the tests for this extension. The `sql` directory holds tests that are written as [SQLLogicTests](https://duckdb.org/dev/sqllogictest/intro.html). DuckDB aims to have most its tests in this format as SQL statements, so for the quack extension, this should probably be the goal too.
+# SQL tests (SQLLogicTests)
 
-[//]: # (The root makefile contains targets to build and run all of these tests. To run the SQLLogicTests:)
+SQL end-to-end tests against the graph datasets under `data/`, living in
+`test/sql/graphar/`. They are discovered and run by DuckDB's own `unittest`
+binary (registered via the `LOAD_TESTS` flag in `extension_config.cmake`,
+grouped under the `[graphar]` tag).
 
-[//]: # (```bash)
+```bash
+make test-sql            # release (default)
+make test-sql-debug      # debug build
+./build/release/test/unittest "[graphar]"   # or invoke directly
+```
 
-[//]: # (make test)
-
-[//]: # (```)
-
-[//]: # (or )
-
-[//]: # (```bash)
-
-[//]: # (make test_debug)
-
-[//]: # (```)
+> The C++ unit tests live under `test/cpp/` (see `test/cpp/README.md`).
