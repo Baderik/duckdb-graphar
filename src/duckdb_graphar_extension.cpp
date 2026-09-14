@@ -54,7 +54,7 @@ static void LoadInternal(ExtensionLoader& loader) {
                               LogicalType::VARCHAR, Value("auto"));
 
     // Initialize GlobalLogManager before using any logging macros
-    GlobalLogManager::Initialize(loader.GetDatabaseInstance(), duckdb::LogLevel::LOG_WARNING);
+    GlobalLogManager::Initialize(loader.GetDatabaseInstance(), duckdb::LogLevel::LOG_ERROR);
 
     auto duckdb_graphar_scalar_function =
         ScalarFunction("duckdb_graphar", {LogicalType::VARCHAR}, LogicalType::VARCHAR, QuackScalarFun);
