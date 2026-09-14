@@ -24,7 +24,7 @@ namespace duckdb {
 // Bind
 //-------------------------------------------------------------------
 unique_ptr<FunctionData> EdgesVertex::Bind(ClientContext& context, TableFunctionBindInput& input,
-                                           vector<LogicalType>& return_types, vector<string>& names) {
+                                           vector<LogicalType>& return_types, vector<Identifier>& names) {
     bool time_logging = GraphArSettings::is_time_logging(context);
 
     ScopedTimer t("Bind");
@@ -58,7 +58,7 @@ unique_ptr<FunctionData> EdgesVertex::Bind(ClientContext& context, TableFunction
     return_types.push_back(LogicalType::BIGINT);
     names.push_back("degree");
     return_types.push_back(LogicalTypeId::BIGINT);
-    names.push_back(GID_COLUMN);
+    names.push_back(Identifier(GID_COLUMN));
 
     DUCKDB_GRAPHAR_LOG_DEBUG("Bind finish");
     if (time_logging) {
