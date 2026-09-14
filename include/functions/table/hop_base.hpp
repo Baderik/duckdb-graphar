@@ -115,7 +115,8 @@ public:
                 "Use either:\n"
                 "  %s('path.yaml', src='...', dst='...', type='...')\n"
                 "  %s('table_name', catalog='...')",
-                input.table_function.name, input.table_function.name, input.table_function.name);
+                input.table_function.GetName().GetIdentifierName(), input.table_function.GetName().GetIdentifierName(),
+                input.table_function.GetName().GetIdentifierName());
         }
 
         return !is_path_mode;
@@ -222,11 +223,11 @@ public:
         bind_data.filter_column = bind_data.GetSrcName();
     }
 
-    static void SetBindDataDstIdx(vector<string>& names, HopBaseBindData& bind_data) {
+    static void SetBindDataDstIdx(vector<Identifier>& names, HopBaseBindData& bind_data) {
         DUCKDB_GRAPHAR_LOG_TRACE("HopBase::SetBindDataDstIdx");
         auto dst_col = bind_data.GetDstName();
         for (size_t i = 0; i < names.size(); ++i) {
-            if (names[i] == dst_col) {
+            if (names[i].GetIdentifierName() == dst_col) {
                 bind_data.dst_column_idx = i;
                 break;
             }
