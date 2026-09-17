@@ -131,10 +131,13 @@ jobs:
       - name: Build extension (inside Docker)
         run: |
           mkdir -p ccache_dir
+          # ARROW_S3=ON makes Arrow run find_package(CURL), so libcurl-devel
+          # (and openssl-devel, also required for S3) must be present in the
+          # manylinux container before configuring Arrow.
           docker run --env-file=docker_env.txt \
             -v `pwd`:/duckdb_build_dir \
             -v `pwd`/ccache_dir:/ccache_dir \
-            duckdb/linux_amd64 make release
+            duckdb/linux_amd64 bash -lc "yum install -y libcurl-devel openssl-devel && make release"
 
       - name: Verify DuckDB build version
         run: |
