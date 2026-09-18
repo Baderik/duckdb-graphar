@@ -168,6 +168,24 @@ jobs:
               echo "CURL_INC_DIR=$CURL_INC_DIR"
               ls -l "$CURL_LIB_DIR"/libcurl.so* 2>/dev/null || true
               ls -l "$CURL_INC_DIR"/curl/curl.h 2>/dev/null || true
+              # aws-c-cal (bundled AWS SDK) needs a STATIC libcrypto.a. The
+              # RHEL/el8 openssl-devel only ships .so (no libcrypto.a), and
+              # openssl-static is not in the repo. If the static lib is missing,
+              # build OpenSSL 1.1.1k from source with no-shared into /usr/local
+              # and point FindOpenSSL at it.
+              if ! ls /usr/lib64/libcrypto.a /usr/lib/x86_64-linux-gnu/libcrypto.a >/dev/null 2>&1; then
+                echo "=== Static libcrypto.a missing; building OpenSSL 1.1.1k from source ==="
+                cd /tmp && rm -rf openssl-1.1.1k* && \
+                curl -fsSL https://www.openssl.org/source/old/1.1.1/openssl-1.1.1k.tar.gz -o openssl.tar.gz && \
+                tar xzf openssl.tar.gz && cd openssl-1.1.1k && \
+                ./config --prefix=/usr/local --openssldir=/usr/local/ssl no-shared && \
+                make -j$(nproc) && make install_sw
+                export OPENSSL_ROOT_DIR=/usr/local
+                echo "OPENSSL_ROOT_DIR=/usr/local (built static)"
+              else
+                echo "Static libcrypto.a already present"
+                ls -l /usr/lib64/libcrypto.a /usr/lib/x86_64-linux-gnu/libcrypto.a 2>/dev/null || true
+              fi
               make release
             '
 
