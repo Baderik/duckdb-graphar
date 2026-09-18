@@ -159,15 +159,25 @@ jobs:
               # The container base may be RHEL-like (/usr/lib64) or
               # Debian/Ubuntu (/usr/lib/x86_64-linux-gnu). Rather than guess,
               # locate the real lib/header dirs and point CMake at them so
-              # FindCURL / FindOpenSSL resolve.
+              # FindCURL / FindZLIB / FindOpenSSL resolve.
               CURL_LIB_DIR=$(dirname "$(find /usr -name 'libcurl.so*' 2>/dev/null | head -1)")
               CURL_INC_DIR=$(dirname "$(find /usr -path '*curl/curl.h' 2>/dev/null | head -1)")
-              export CMAKE_LIBRARY_PATH="$CURL_LIB_DIR"
+              # Collect every distinct lib dir we need (curl, zlib, and the
+              # system lib64 dirs) into a single CMAKE_LIBRARY_PATH.
+              LIB_DIRS="$CURL_LIB_DIR"
+              for d in /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/local/lib64 /usr/local/lib; do
+                case ":$LIB_DIRS:" in *":$d:"*) ;; *) LIB_DIRS="$LIB_DIRS:$d" ;; esac
+              done
+              export CMAKE_LIBRARY_PATH="$LIB_DIRS"
               export CMAKE_INCLUDE_PATH="$CURL_INC_DIR"
               echo "CURL_LIB_DIR=$CURL_LIB_DIR"
               echo "CURL_INC_DIR=$CURL_INC_DIR"
+              echo "CMAKE_LIBRARY_PATH=$CMAKE_LIBRARY_PATH"
               ls -l "$CURL_LIB_DIR"/libcurl.so* 2>/dev/null || true
               ls -l "$CURL_INC_DIR"/curl/curl.h 2>/dev/null || true
+              echo "=== zlib ==="
+              find /usr /usr/local -name 'libz.*' 2>/dev/null | head -10 || true
+              ls -l /usr/lib64/libz.* /usr/lib/x86_64-linux-gnu/libz.* 2>/dev/null || true
               # aws-c-cal (bundled AWS SDK) needs a STATIC libcrypto.a. The
               # RHEL/el8 openssl-devel only ships .so (no libcrypto.a), and
               # openssl-static is not in the repo. If the static lib is missing,
