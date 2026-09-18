@@ -144,10 +144,14 @@ jobs:
             -v `pwd`/ccache_dir:/ccache_dir \
             duckdb/linux_amd64 bash -lc '
               yum install -y libcurl-devel openssl-devel
-              # FindOpenSSL locates libcrypto/libssl via find_library, which on
-              # RHEL-like systems does not search /usr/lib64 by default. Point
-              # CMAKE_LIBRARY_PATH there so OPENSSL_CRYPTO_LIBRARY resolves.
-              export CMAKE_LIBRARY_PATH=/usr/lib64
+              # RHEL-like systems keep 64-bit libs in /usr/lib64, but CMake
+              # find_library (used by FindOpenSSL in the bundled AWS SDK) does
+              # not search /usr/lib64 by default. Expose the OpenSSL libs via
+              # symlinks in /usr/lib so find_library can locate them.
+              ls -l /usr/lib64/libcrypto* /usr/lib64/libssl* 2>/dev/null || true
+              ln -sf /usr/lib64/libcrypto.so /usr/lib/libcrypto.so
+              ln -sf /usr/lib64/libssl.so /usr/lib/libssl.so
+              ls -l /usr/lib/libcrypto.so /usr/lib/libssl.so 2>/dev/null || true
               make release
             '
 
