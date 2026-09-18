@@ -54,13 +54,6 @@ if(UNIX AND NOT APPLE)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
     # Temp fix dublicate arrow on linux
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--allow-multiple-definition")
-    # Do not link against the dynamic glibc by default and statically pull in
-    # the non-shared libc parts (libc_nonshared.a). This stops those symbols
-    # from recording GLIBC_2.x version requirements, so the resulting extension
-    # loads on older glibc (e.g. Debian 11 = glibc 2.31) even when built on a
-    # newer host (ubuntu-22.04 = glibc 2.35).
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -nolibc -l:libc_nonshared.a")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -nolibc -l:libc_nonshared.a")
 endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/extension_deps.cmake")
@@ -118,6 +111,18 @@ set(EXTENSION_LIBRARIES
 
 target_link_libraries(${EXTENSION_NAME} ${EXTENSION_LIBRARIES})
 target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXTENSION_LIBRARIES})
+
+# Linux loadable extension: do not link against the dynamic glibc by default and
+# statically pull in the non-shared libc parts (libc_nonshared.a). This stops
+# those symbols from recording GLIBC_2.x version requirements, so the extension
+# loads on older glibc (e.g. Debian 11 = glibc 2.31) even when built on a newer
+# host (ubuntu-22.04 = glibc 2.35). Applied ONLY to the extension target (not
+# globally) so executables like unittest_graphar and the duckdb shell still link
+# libc normally.
+if(UNIX AND NOT APPLE)
+    target_link_options(${LOADABLE_EXTENSION_NAME} PRIVATE -nolibc -Wl,--no-as-needed)
+    target_link_libraries(${LOADABLE_EXTENSION_NAME} PRIVATE "-l:libc_nonshared.a")
+endif()
 
 install(TARGETS ${EXTENSION_NAME}
         EXPORT "${DUCKDB_EXPORT_SET}"
