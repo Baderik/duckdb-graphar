@@ -121,7 +121,7 @@ target_link_libraries(${LOADABLE_EXTENSION_NAME} ${EXTENSION_LIBRARIES})
 # libc normally.
 if(UNIX AND NOT APPLE)
     target_link_options(${LOADABLE_EXTENSION_NAME} PRIVATE -nolibc -Wl,--no-as-needed)
-    target_link_libraries(${LOADABLE_EXTENSION_NAME} PRIVATE "-l:libc_nonshared.a")
+    target_link_libraries(${LOADABLE_EXTENSION_NAME} "-l:libc_nonshared.a")
 endif()
 
 install(TARGETS ${EXTENSION_NAME}
