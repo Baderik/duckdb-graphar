@@ -147,10 +147,10 @@ jobs:
             duckdb/linux_amd64 bash -lc '
               # ARROW_S3 pulls the bundled AWS SDK, which needs a STATIC
               # OpenSSL (libcrypto.a) -- the build log shows
-              # "crypto_STATIC_LIBRARY: $<TARGET_FILE:crypto>". manylinux_2_28
-              # (RHEL 8) ships only shared libs; libcrypto.a comes from the
-              # openssl-static package.
-              yum install -y libcurl-devel openssl-devel openssl-static
+              # "crypto_STATIC_LIBRARY: $<TARGET_FILE:crypto>". On RHEL 8 /
+              # manylinux_2_28 the static libcrypto.a/libssl.a ship inside
+              # openssl-devel (no separate openssl-static package on el8).
+              yum install -y libcurl-devel openssl-devel
               # RHEL keeps 64-bit libs in /usr/lib64, outside CMake's default
               # find_library search (/usr/lib). Expose the dev libs and headers
               # so FindCURL and FindOpenSSL can locate them.
