@@ -144,9 +144,10 @@ jobs:
             -v `pwd`/ccache_dir:/ccache_dir \
             duckdb/linux_amd64 bash -lc '
               yum install -y libcurl-devel openssl-devel
-              CRYPTO=$(ls /usr/lib64/libcrypto.so 2>/dev/null || ls /usr/lib/x86_64-linux-gnu/libcrypto.so 2>/dev/null)
-              SSL=$(ls /usr/lib64/libssl.so 2>/dev/null || ls /usr/lib/x86_64-linux-gnu/libssl.so 2>/dev/null)
-              echo "CRYPTO=$CRYPTO SSL=$SSL"
+              # FindOpenSSL locates libcrypto/libssl via find_library, which on
+              # RHEL-like systems does not search /usr/lib64 by default. Point
+              # CMAKE_LIBRARY_PATH there so OPENSSL_CRYPTO_LIBRARY resolves.
+              export CMAKE_LIBRARY_PATH=/usr/lib64
               make release
             '
 
