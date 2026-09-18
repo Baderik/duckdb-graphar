@@ -126,18 +126,29 @@ jobs:
           LINUX_CI_IN_DOCKER=$LINUX_CI_IN_DOCKER
           CCACHE_MAXSIZE=$CCACHE_MAXSIZE
           CCACHE_NOCOMPRESS=$CCACHE_NOCOMPRESS
+          # manylinux_2_28 is RHEL-like: OpenSSL lives under /usr/lib64, but
+          # FindOpenSSL (used by the bundled AWS SDK pulled by ARROW_S3) looks
+          # in /usr/lib by default. Point it at the real root.
+          OPENSSL_ROOT_DIR=/usr
           EOF
 
       - name: Build extension (inside Docker)
         run: |
           mkdir -p ccache_dir
-          # ARROW_S3=ON makes Arrow run find_package(CURL), so libcurl-devel
-          # (and openssl-devel, also required for S3) must be present in the
-          # manylinux container before configuring Arrow.
+          # ARROW_S3=ON pulls the bundled AWS SDK, which calls find_package(CURL)
+          # and find_package(OpenSSL). manylinux_2_28 ships no dev headers by
+          # default, so install libcurl-devel and openssl-devel, then export the
+          # OpenSSL library paths that FindOpenSSL is failing to locate.
           docker run --env-file=docker_env.txt \
             -v `pwd`:/duckdb_build_dir \
             -v `pwd`/ccache_dir:/ccache_dir \
-            duckdb/linux_amd64 bash -lc "yum install -y libcurl-devel openssl-devel && make release"
+            duckdb/linux_amd64 bash -lc '
+              yum install -y libcurl-devel openssl-devel
+              CRYPTO=$(ls /usr/lib64/libcrypto.so 2>/dev/null || ls /usr/lib/x86_64-linux-gnu/libcrypto.so 2>/dev/null)
+              SSL=$(ls /usr/lib64/libssl.so 2>/dev/null || ls /usr/lib/x86_64-linux-gnu/libssl.so 2>/dev/null)
+              echo "CRYPTO=$CRYPTO SSL=$SSL"
+              make release
+            '
 
       - name: Verify DuckDB build version
         run: |
