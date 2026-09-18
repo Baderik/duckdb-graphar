@@ -151,11 +151,14 @@ jobs:
               # manylinux_2_28 the static libcrypto.a/libssl.a ship inside
               # openssl-devel (no separate openssl-static package on el8).
               yum install -y libcurl-devel openssl-devel
-              # RHEL keeps 64-bit libs in /usr/lib64, outside CMake's default
-              # find_library search (/usr/lib). Expose the dev libs and headers
-              # so FindCURL and FindOpenSSL can locate them.
+              # /usr/lib is read-only in manylinux_2_28, so we cannot create
+              # symlinks there. Instead, point CMake's find_library/find_path
+              # at /usr/lib64 (and the dev headers in /usr/include) via
+              # CMAKE_LIBRARY_PATH / CMAKE_INCLUDE_PATH so FindCURL and
+              # FindOpenSSL can locate the libs.
+              export CMAKE_LIBRARY_PATH=/usr/lib64
+              export CMAKE_INCLUDE_PATH=/usr/include
               ls -l /usr/lib64/libcurl.so* /usr/include/curl/curl.h 2>/dev/null || true
-              ln -sf /usr/lib64/libcurl.so /usr/lib/libcurl.so
               ls -l /usr/lib64/libcrypto.a /usr/lib64/libssl.a 2>/dev/null || true
               make release
             '
