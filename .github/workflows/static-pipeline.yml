@@ -130,7 +130,6 @@ jobs:
           # CMake find_library (used by FindOpenSSL/FindCURL in the bundled AWS
           # SDK pulled by ARROW_S3) looks in /usr/lib by default. Point it at
           # the real lib dir for the whole build.
-          OPENSSL_ROOT_DIR=/usr
           CMAKE_LIBRARY_PATH=/usr/lib64
           EOF
 
@@ -182,13 +181,15 @@ jobs:
               echo "=== zlib ==="
               find /usr /usr/local -name 'libz.*' 2>/dev/null | head -10 || true
               ls -l /usr/lib64/libz.* /usr/lib/x86_64-linux-gnu/libz.* 2>/dev/null || true
-              # aws-c-cal (bundled AWS SDK) needs a STATIC libcrypto.a. The
-              # RHEL/el8 openssl-devel only ships .so (no libcrypto.a), and
-              # openssl-static is not in the repo. If the static lib is missing,
-              # build OpenSSL 1.1.1k from source with no-shared into /usr/local
-              # and point FindOpenSSL at it.
-              if ! ls /usr/lib64/libcrypto.a /usr/lib/x86_64-linux-gnu/libcrypto.a >/dev/null 2>&1; then
-                echo "=== Static libcrypto.a missing; building OpenSSL 1.1.1k from source ==="
+              # aws-c-cal (bundled AWS SDK) needs a STATIC libcrypto.a. The system
+              # openssl-devel (if present) is linked with zlib, which makes
+              # FindOpenSSL inject a ZLIB::ZLIB dependency that is never
+              # resolved (FindZLIB can't see /usr/lib64) and breaks GraphAr.
+              # So ALWAYS build our own static OpenSSL with no-zlib into
+              # /usr/local (unless we already did in a prior step) and point
+              # FindOpenSSL at it, overriding the system one.
+              if ! ls /usr/local/lib64/libcrypto.a >/dev/null 2>&1; then
+                echo "=== Building static OpenSSL 1.1.1k (no-zlib) from source ==="
                 # Build in a subshell so the CWD stays at the mounted project
                 # dir (/duckdb_build_dir) for the subsequent make release.
                 (
@@ -198,12 +199,11 @@ jobs:
                   ./config --prefix=/usr/local --openssldir=/usr/local/ssl no-shared no-zlib && \
                   make -j$(nproc) && make install_sw
                 )
-                export OPENSSL_ROOT_DIR=/usr/local
-                echo "OPENSSL_ROOT_DIR=/usr/local (built static)"
               else
-                echo "Static libcrypto.a already present"
-                ls -l /usr/lib64/libcrypto.a /usr/lib/x86_64-linux-gnu/libcrypto.a 2>/dev/null || true
+                echo "Static /usr/local/lib64/libcrypto.a already present"
               fi
+              export OPENSSL_ROOT_DIR=/usr/local
+              echo "OPENSSL_ROOT_DIR=/usr/local (no-zlib static)"
               cd /duckdb_build_dir && make release
             '
 
