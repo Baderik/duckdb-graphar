@@ -159,8 +159,8 @@ jobs:
               # Debian/Ubuntu (/usr/lib/x86_64-linux-gnu). Rather than guess,
               # locate the real lib/header dirs and point CMake at them so
               # FindCURL / FindZLIB / FindOpenSSL resolve.
-              CURL_LIB_DIR=$(dirname "$(find /usr -name 'libcurl.so*' 2>/dev/null | head -1)")
-              CURL_INC_DIR=$(dirname "$(find /usr -path '*curl/curl.h' 2>/dev/null | head -1)")
+              CURL_LIB_DIR=$(dirname "$(find /usr -name "libcurl.so*" 2>/dev/null | head -1)")
+              CURL_INC_DIR=$(dirname "$(find /usr -path "*curl/curl.h" 2>/dev/null | head -1)")
               # Collect every distinct lib dir we need (curl, zlib, and the
               # system lib64 dirs) into a single CMAKE_LIBRARY_PATH. CMake list
               # separator is a semicolon (NOT colon like PATH), otherwise the
@@ -179,12 +179,12 @@ jobs:
               ls -l "$CURL_LIB_DIR"/libcurl.so* 2>/dev/null || true
               ls -l "$CURL_INC_DIR"/curl/curl.h 2>/dev/null || true
               echo "=== zlib ==="
-              find /usr /usr/local -name 'libz.*' 2>/dev/null | head -10 || true
+              find /usr /usr/local -name "libz.*" 2>/dev/null | head -10 || true
               ls -l /usr/lib64/libz.* /usr/lib/x86_64-linux-gnu/libz.* 2>/dev/null || true
               # aws-c-cal (bundled AWS SDK) needs a STATIC libcrypto.a. The system
               # openssl-devel (if present) is linked with zlib, which makes
               # FindOpenSSL inject a ZLIB::ZLIB dependency that is never
-              # resolved (FindZLIB can't see /usr/lib64) and breaks GraphAr.
+              # resolved (FindZLIB cannot see /usr/lib64) and breaks GraphAr.
               # So ALWAYS build our own static OpenSSL with no-zlib into
               # /usr/local (unless we already did in a prior step) and point
               # FindOpenSSL at it, overriding the system one.
