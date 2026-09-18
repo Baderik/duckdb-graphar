@@ -143,15 +143,17 @@ jobs:
             -v `pwd`:/duckdb_build_dir \
             -v `pwd`/ccache_dir:/ccache_dir \
             duckdb/linux_amd64 bash -lc '
-              yum install -y libcurl-devel openssl-devel
-              # RHEL-like systems keep 64-bit libs in /usr/lib64, but CMake
-              # find_library (used by FindOpenSSL in the bundled AWS SDK) does
-              # not search /usr/lib64 by default. Expose the OpenSSL libs via
-              # symlinks in /usr/lib so find_library can locate them.
-              ls -l /usr/lib64/libcrypto* /usr/lib64/libssl* 2>/dev/null || true
-              ln -sf /usr/lib64/libcrypto.so /usr/lib/libcrypto.so
-              ln -sf /usr/lib64/libssl.so /usr/lib/libssl.so
-              ls -l /usr/lib/libcrypto.so /usr/lib/libssl.so 2>/dev/null || true
+              # The bundled AWS SDK (aws-c-cal) pulled by ARROW_S3 requires a
+              # STATIC OpenSSL (libcrypto.a), and logs
+              # "crypto_STATIC_LIBRARY: $<TARGET_FILE:crypto>". manylinux_2_28
+              # (RHEL 8) ships only the shared libs by default; the static
+              # libcrypto.a comes from the openssl-static package. Install it
+              # along with the dev headers (openssl-devel) for the S3 support.
+              yum install -y libcurl-devel openssl-devel openssl-static
+              # RHEL keeps 64-bit libs in /usr/lib64; expose the static libs in
+              # /usr/lib64/libcrypto.a (already there via openssl-static) so
+              # find_library can locate them.
+              ls -l /usr/lib64/libcrypto.a /usr/lib64/libssl.a 2>/dev/null || true
               make release
             '
 
