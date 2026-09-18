@@ -204,6 +204,18 @@ jobs:
               fi
               export OPENSSL_ROOT_DIR=/usr/local
               echo "OPENSSL_ROOT_DIR=/usr/local (no-zlib static)"
+              # FindOpenSSL computes static deps via pkg-config
+              # (_OPENSSL_STATIC_LIBRARIES). Without PKG_CONFIG_PATH it picks
+              # the SYSTEM openssl (/usr/lib64/pkgconfig), which is built WITH
+              # zlib, so FindOpenSSL injects ZLIB::ZLIB and breaks GraphAr.
+              # Point pkg-config at our no-zlib OpenSSL .pc files.
+              export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}
+              echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+              echo "=== our openssl .pc ==="
+              ls -l /usr/local/lib64/pkgconfig/*.pc /usr/local/lib/pkgconfig/*.pc 2>/dev/null || true
+              echo "=== system openssl pc (should NOT be used) ==="
+              pkg-config --modversion openssl 2>/dev/null || true
+              pkg-config --libs --static openssl 2>/dev/null || true
               cd /duckdb_build_dir && make release
             '
 
