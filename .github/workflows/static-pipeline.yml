@@ -101,12 +101,14 @@ jobs:
               # "bullseye/updates"). Rewrite sources.list with the correct
               # archive URLs.
               # NOTE: whole script is wrapped in single quotes, so use double
-              # quotes inside (no single quotes).
-              cat > /etc/apt/sources.list <<EOF2
-              deb http://archive.debian.org/debian bullseye main contrib non-free
-              deb http://archive.debian.org/debian bullseye-updates main contrib non-free
-              deb http://archive.debian.org/debian-security bullseye/updates main contrib non-free
-              EOF2
+              # quotes inside (no single quotes). Avoid heredocs -- YAML block
+              # scalars keep leading whitespace, so a <<EOF2 delimiter at
+              # column 0 never matches. Write sources.list with printf instead.
+              printf "%s\\n" \
+                "deb http://archive.debian.org/debian bullseye main contrib non-free" \
+                "deb http://archive.debian.org/debian bullseye-updates main contrib non-free" \
+                "deb http://archive.debian.org/debian-security bullseye/updates main contrib non-free" \
+                > /etc/apt/sources.list
               echo "APT::Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99nocheckvalid
               apt-get update -qq -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true
               apt-get install -y -qq --allow-unauthenticated build-essential git pkg-config curl \
