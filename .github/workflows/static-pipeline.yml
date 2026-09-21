@@ -47,14 +47,16 @@ jobs:
         run: |
           find src/ include/ -name '*.cpp' -o -name '*.hpp' | xargs clang-format-19 --dry-run -Werror
 
-  build:
-    name: ${{ matrix.os }} Build and Test
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, macos-14]
+  # Linux build runs inside a debian:11 container (glibc 2.31) so the resulting
+  # extension loads on Debian 11 and any distro with glibc >= 2.31. Building
+  # directly on ubuntu-22.04 (glibc 2.35) produced binaries requiring
+  # GLIBC_2.32+ symbols (e.g. __libc_single_threaded) that are absent on
+  # Debian 11. Tests still run on the runner outside the container (a glibc
+  # 2.31 binary runs fine on the glibc 2.35 runner).
+  build-linux:
+    name: Linux Build and Test (debian:11)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
 
     steps:
       - name: Checkout Repository
@@ -64,41 +66,10 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Install System Dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
+      - name: Install Runner Dependencies (for tests)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake curl libcurl4-openssl-dev zlib1g-dev \
-            libzstd-dev libsnappy-dev ccache python3-pip
-
-      - name: Install System Dependencies (macOS)
-        if: matrix.os == 'macos-14'
-        run: brew install ccache
-
-      - name: Set up specific CMake version (macOS)
-        if: matrix.os == 'macos-14'
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: '3.28.3'
-
-      - name: Set up ccache
-        run: |
-          mkdir -p ${{ runner.workspace }}/.ccache
-          echo "CCACHE_DIR=${{ runner.workspace }}/.ccache" >> $GITHUB_ENV
-          if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-            echo "/usr/lib/ccache" >> $GITHUB_PATH
-          elif [ "${{ matrix.os }}" = "macos-14" ]; then
-            echo "/usr/local/opt/ccache/libexec" >> $GITHUB_PATH
-          fi
-
-      - name: Cache ccache
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ hashFiles('Makefile', 'CMakeLists.txt', 'extension_config.cmake') }}
-          restore-keys: |
-            ${{ runner.os }}-ccache
+          sudo apt-get install -y --no-install-recommends python3-pip ccache
 
       - name: Cache Arrow and GraphAr
         id: cache-third-party
@@ -106,18 +77,36 @@ jobs:
         with:
           path: |
             third_party/
-          key: ${{ runner.os }}-third-party-${{ hashFiles('Makefile') }}
+          key: linux-third-party-${{ hashFiles('Makefile') }}
           restore-keys: |
-            ${{ runner.os }}-third-party
+            linux-third-party
 
       - name: Skip Arrow/GraphAr build if cached
         if: steps.cache-third-party.outputs.cache-hit == 'true'
         run: |
           echo "Arrow and GraphAr restored from cache"
 
-      - name: Build
+      - name: Build extension (inside debian:11 container)
         run: |
-          make release
+          mkdir -p ccache_dir
+          docker run --rm \
+            -v `pwd`:/duckdb_build_dir \
+            -v `pwd`/ccache_dir:/ccache_dir \
+            debian:11 bash -lc '
+              set -e
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq build-essential git pkg-config curl \
+                libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev libsnappy-dev \
+                ccache python3 python3-pip
+              # debian:11 ships cmake 3.18; use a newer cmake + ninja via pip.
+              pip3 install -q cmake ninja
+              export PATH=/usr/local/bin:$PATH
+              export CCACHE_DIR=/ccache_dir
+              export CXX="ccache g++"
+              export CC="ccache gcc"
+              cd /duckdb_build_dir && make release
+            '
 
       - name: Verify DuckDB build version
         run: |
@@ -130,14 +119,12 @@ jobs:
           fi
 
       - name: Install GraphAr CLI and Generate Data
-        if: matrix.os == 'ubuntu-22.04'
         run: |
           pip3 install --upgrade pip
           ./scripts/install-cli.sh || exit 1
           ./scripts/generate-graphar-data.sh || exit 1
 
       - name: Run tests
-        if: matrix.os == 'ubuntu-22.04'
         run: |
           make test
 
@@ -151,7 +138,74 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: duckdb-graphar-${{ matrix.os }}
+          name: duckdb-graphar-linux
           path: upload-artifacts
           if-no-files-found: error
 
+  build-macos:
+    name: macOS Build and Test
+    runs-on: macos-14
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install System Dependencies (macOS)
+        run: brew install ccache
+
+      - name: Set up specific CMake version (macOS)
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.28.3'
+
+      - name: Set up ccache
+        run: |
+          mkdir -p ${{ runner.workspace }}/.ccache
+          echo "CCACHE_DIR=${{ runner.workspace }}/.ccache" >> $GITHUB_ENV
+          echo "/usr/local/opt/ccache/libexec" >> $GITHUB_PATH
+
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.workspace }}/.ccache
+          key: macos-ccache-${{ hashFiles('Makefile', 'CMakeLists.txt', 'extension_config.cmake') }}
+          restore-keys: |
+            macos-ccache
+
+      - name: Cache Arrow and GraphAr
+        id: cache-third-party
+        uses: actions/cache@v5
+        with:
+          path: |
+            third_party/
+          key: macos-third-party-${{ hashFiles('Makefile') }}
+          restore-keys: |
+            macos-third-party
+
+      - name: Skip Arrow/GraphAr build if cached
+        if: steps.cache-third-party.outputs.cache-hit == 'true'
+        run: |
+          echo "Arrow and GraphAr restored from cache"
+
+      - name: Build
+        run: |
+          make release
+
+      - name: Prepare Artifacts for Upload
+        run: |
+          mkdir -p upload-artifacts
+
+          cp build/release/duckdb upload-artifacts/
+          cp build/release/extension/duckdb_graphar/duckdb_graphar.duckdb_extension upload-artifacts/
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: duckdb-graphar-macos
+          path: upload-artifacts
+          if-no-files-found: error
