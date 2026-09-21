@@ -96,13 +96,19 @@ jobs:
               set -e
               export DEBIAN_FRONTEND=noninteractive
               # Debian 11 (bullseye) is EOL: packages moved to archive.debian.org,
-              # deb.debian.org returns 404. Point sources at the archive and
-              # relax apt checks (old release dates / archive signing).
+              # deb.debian.org returns 404, and the archive has no
+              # "bullseye-security" dist (security updates live in
+              # "bullseye/updates"). Rewrite sources.list with the correct
+              # archive URLs.
               # NOTE: whole script is wrapped in single quotes, so use double
               # quotes inside (no single quotes).
-              sed -i "s|deb.debian.org|archive.debian.org|g" /etc/apt/sources.list
+              cat > /etc/apt/sources.list <<EOF2
+              deb http://archive.debian.org/debian bullseye main contrib non-free
+              deb http://archive.debian.org/debian bullseye-updates main contrib non-free
+              deb http://archive.debian.org/debian-security bullseye/updates main contrib non-free
+              EOF2
               echo "APT::Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99nocheckvalid
-              apt-get update -qq -o Acquire::AllowInsecureRepositories=true
+              apt-get update -qq -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true
               apt-get install -y -qq --allow-unauthenticated build-essential git pkg-config curl \
                 libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev libsnappy-dev \
                 ccache python3 python3-pip
