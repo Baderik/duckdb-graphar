@@ -16,7 +16,7 @@
 namespace duckdb {
 
 unique_ptr<FunctionData> ShortestPath::Bind(ClientContext& context, TableFunctionBindInput& input,
-                                            vector<LogicalType>& return_types, vector<string>& names) {
+                                            vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ShortestPath::Bind");
 
     auto bind_data = make_uniq<ShortestPathBindData>();
@@ -81,7 +81,7 @@ unique_ptr<FunctionData> ShortestPath::Bind(ClientContext& context, TableFunctio
         auto schema_name = qname.Schema();
         Binder::BindSchemaOrCatalog(context, catalog_name, schema_name);
 
-        auto& entry = Catalog::GetEntry(context, CatalogType::TABLE_ENTRY, catalog_name, schema_name, qname.Name());
+        auto& entry = Catalog::GetEntry(context, CatalogType::TABLE_ENTRY, qname);
 
         auto& table_entry = entry.template Cast<GraphArTableEntry>();
         auto table_info = table_entry.GetTableInfo();

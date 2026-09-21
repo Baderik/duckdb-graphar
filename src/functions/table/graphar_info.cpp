@@ -7,7 +7,7 @@
 namespace duckdb {
 
 unique_ptr<FunctionData> GraphArInfo::Bind(ClientContext& context, TableFunctionBindInput& input,
-                                           vector<LogicalType>& return_types, vector<string>& names) {
+                                           vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("GraphArInfo::Bind");
     names.emplace_back("extension_commit");
     return_types.emplace_back(GraphArFunctions::graphArT2duckT("string"));
