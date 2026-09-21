@@ -104,10 +104,12 @@ jobs:
               # quotes inside (no single quotes). Avoid heredocs -- YAML block
               # scalars keep leading whitespace, so a <<EOF2 delimiter at
               # column 0 never matches. Write sources.list with printf instead.
+              # Only main is needed (build-essential, dev packages, etc. are
+              # all in main); the EOL security archive 404s on both
+              # bullseye-security and bullseye/updates, so omit it entirely.
               printf "%s\\n" \
                 "deb http://archive.debian.org/debian bullseye main contrib non-free" \
                 "deb http://archive.debian.org/debian bullseye-updates main contrib non-free" \
-                "deb http://archive.debian.org/debian-security bullseye/updates main contrib non-free" \
                 > /etc/apt/sources.list
               echo "APT::Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99nocheckvalid
               apt-get update -qq -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true
