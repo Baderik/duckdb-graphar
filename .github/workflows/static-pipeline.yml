@@ -89,10 +89,12 @@ jobs:
       - name: Build extension (inside debian:11 container)
         run: |
           mkdir -p ccache_dir
-          docker run --rm \
+          echo "runner uid: $(id -u) $(id -un)"
+          docker run --rm --user root \
             -v `pwd`:/duckdb_build_dir \
             -v `pwd`/ccache_dir:/ccache_dir \
             debian:11 bash -lc '
+              echo "container user: $(id -u) $(id -un)"
               set -e
               export DEBIAN_FRONTEND=noninteractive
               # Debian 11 (bullseye) is EOL: packages moved to archive.debian.org,
