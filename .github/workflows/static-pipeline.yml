@@ -51,25 +51,41 @@ jobs:
   # extension loads on Debian 11 and any distro with glibc >= 2.31. Building
   # directly on ubuntu-22.04 (glibc 2.35) produced binaries requiring
   # GLIBC_2.32+ symbols (e.g. __libc_single_threaded) that are absent on
-  # Debian 11. Tests still run on the runner outside the container (a glibc
-  # 2.31 binary runs fine on the glibc 2.35 runner).
+  # Debian 11. Using the native `container:` key (instead of docker run) so apt
+  # runs as root and EOL sources can be fixed.
   build-linux:
     name: Linux Build and Test (debian:11)
     runs-on: ubuntu-22.04
+    container:
+      image: debian:11
     timeout-minutes: 180
 
     steps:
+      - name: Fix EOL apt sources and install build deps
+        run: |
+          set -e
+          export DEBIAN_FRONTEND=noninteractive
+          # Debian 11 (bullseye) is EOL: packages moved to archive.debian.org.
+          # Rewrite sources.list with archive URLs (only main is needed).
+          printf "%s\\n" \
+            "deb http://archive.debian.org/debian bullseye main contrib non-free" \
+            "deb http://archive.debian.org/debian bullseye-updates main contrib non-free" \
+            > /etc/apt/sources.list
+          echo "APT::Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99nocheckvalid
+          apt-get update -qq -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true
+          apt-get -y -f install --allow-unauthenticated -o Acquire::AllowInsecureRepositories=true
+          apt-get -y --allow-unauthenticated -o Acquire::AllowInsecureRepositories=true dist-upgrade
+          apt-get install -y -qq --allow-unauthenticated \
+            build-essential git pkg-config curl \
+            libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev libsnappy-dev \
+            ccache python3 python3-pip
+
       - name: Checkout Repository
         uses: actions/checkout@v5
         with:
           submodules: true
           fetch-depth: 0
           fetch-tags: true
-
-      - name: Install Runner Dependencies (for tests)
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends python3-pip ccache
 
       - name: Cache Arrow and GraphAr
         id: cache-third-party
@@ -86,51 +102,14 @@ jobs:
         run: |
           echo "Arrow and GraphAr restored from cache"
 
-      - name: Build extension (inside debian:11 container)
+      - name: Build extension
         run: |
-          mkdir -p ccache_dir
-          echo "runner uid: $(id -u) $(id -un)"
-          docker run --rm --user root \
-            -v `pwd`:/duckdb_build_dir \
-            -v `pwd`/ccache_dir:/ccache_dir \
-            debian:11 bash -lc '
-              echo "container user: $(id -u) $(id -un)"
-              set -e
-              export DEBIAN_FRONTEND=noninteractive
-              # Debian 11 (bullseye) is EOL: packages moved to archive.debian.org,
-              # deb.debian.org returns 404, and the archive has no
-              # "bullseye-security" dist (security updates live in
-              # "bullseye/updates"). Rewrite sources.list with the correct
-              # archive URLs.
-              # NOTE: whole script is wrapped in single quotes, so use double
-              # quotes inside (no single quotes). Avoid heredocs -- YAML block
-              # scalars keep leading whitespace, so a <<EOF2 delimiter at
-              # column 0 never matches. Write sources.list with printf instead.
-              # Only main is needed (build-essential, dev packages, etc. are
-              # all in main); the EOL security archive 404s on both
-              # bullseye-security and bullseye/updates, so omit it entirely.
-              printf "%s\\n" \
-                "deb http://archive.debian.org/debian bullseye main contrib non-free" \
-                "deb http://archive.debian.org/debian bullseye-updates main contrib non-free" \
-                > /etc/apt/sources.list
-              echo "APT::Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99nocheckvalid
-              apt-get update -qq -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true
-              # EOL archive often leaves the base image's package set slightly
-              # out of sync with main, causing 'held broken packages'. First
-              # repair dependency conflicts, then upgrade to archive versions.
-              apt-get -y -f install --allow-unauthenticated -o Acquire::AllowInsecureRepositories=true
-              apt-get -y --allow-unauthenticated -o Acquire::AllowInsecureRepositories=true dist-upgrade
-              apt-get install -y -qq --allow-unauthenticated build-essential git pkg-config curl \
-                libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev libsnappy-dev \
-                ccache python3 python3-pip
-              # debian:11 ships cmake 3.18; use a newer cmake + ninja via pip.
-              pip3 install -q cmake ninja
-              export PATH=/usr/local/bin:$PATH
-              export CCACHE_DIR=/ccache_dir
-              export CXX="ccache g++"
-              export CC="ccache gcc"
-              cd /duckdb_build_dir && make release
-            '
+          # debian:11 ships cmake 3.18; use a newer cmake + ninja via pip.
+          pip3 install -q cmake ninja
+          export PATH=/usr/local/bin:$PATH
+          export CXX="ccache g++"
+          export CC="ccache gcc"
+          make release
 
       - name: Verify DuckDB build version
         run: |
