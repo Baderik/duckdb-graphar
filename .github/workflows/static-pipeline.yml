@@ -105,7 +105,6 @@ jobs:
           cd duckdb
           git fetch --tags origin
           cd ..
-          DUCKDB_GIT_VERSION=$(cat .github/duckdb_version) make set_duckdb_version
           cd duckdb && echo "duckdb_hash=$(git rev-parse HEAD)"
 
       - name: Build DuckDB GraphAr Docker image
@@ -315,7 +314,6 @@ jobs:
           cd duckdb
           git fetch --tags origin
           cd ..
-          DUCKDB_GIT_VERSION=$(cat .github/duckdb_version) make set_duckdb_version
           cd duckdb && echo "duckdb_hash=$(git rev-parse HEAD)"
 
       - name: Build
