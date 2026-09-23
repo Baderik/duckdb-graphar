@@ -127,7 +127,7 @@ $(ARROW_INSTALLED): $(ARROW_BUILT)
 
 $(GRAPHAR_CLONED): $(ARROW_INSTALLED)
 	@echo "Clone Apache GraphAr"
-	rm -rf $(GRAPHAR_DIR)
+	rm -rf $(GRAPHAR_SRC_DIR)
 	mkdir -p $(GRAPHAR_DIR)
 	git clone $(GRAPHAR_REP) $(GRAPHAR_SRC_DIR)
 	git -C $(GRAPHAR_SRC_DIR) checkout $(GRAPHAR_COMMIT)
