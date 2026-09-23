@@ -130,6 +130,7 @@ $(GRAPHAR_CLONED): $(ARROW_INSTALLED)
 	rm -rf $(GRAPHAR_SRC_DIR)
 	mkdir -p $(GRAPHAR_DIR)
 	git clone $(GRAPHAR_REP) $(GRAPHAR_SRC_DIR)
+	git config --global --add safe.directory $(GRAPHAR_SRC_DIR)
 	git -C $(GRAPHAR_SRC_DIR) checkout $(GRAPHAR_COMMIT)
 	@touch $(GRAPHAR_CLONED)
 
