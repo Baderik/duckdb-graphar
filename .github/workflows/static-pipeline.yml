@@ -245,6 +245,10 @@ jobs:
       - name: Install GraphAr CLI and Generate Data
         run: |
           pip3 install --upgrade pip
+          # The Docker build step created build/ (and other artifacts) as root
+          # via the mounted volume; hand ownership to the runner so
+          # scikit-build-core can create its own build/ dir for graphar_cli.
+          sudo chown -R $(id -u):$(id -g) . || true
           ./scripts/install-cli.sh || exit 1
           ./scripts/generate-graphar-data.sh || exit 1
 
