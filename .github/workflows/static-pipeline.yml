@@ -216,6 +216,13 @@ jobs:
               echo "=== system openssl pc (should NOT be used) ==="
               pkg-config --modversion openssl 2>/dev/null || true
               pkg-config --libs --static openssl 2>/dev/null || true
+              # manylinux image ships vcpkg; its toolchain breaks CMake because
+              # the repo has no vcpkg.json manifest. Disable it and ensure ninja
+              # is on PATH (bundled python) before configuring DuckDB.
+              unset VCPKG_ROOT VCPKG_MANIFEST_DIR 2>/dev/null || true
+              export CMAKE_TOOLCHAIN_FILE=
+              pip3 install -q ninja 2>/dev/null || true
+              export PATH="/opt/python/cp312-cp312/bin:${PATH}"
               cd /duckdb_build_dir && make release
             '
 

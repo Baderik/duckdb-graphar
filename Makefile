@@ -85,7 +85,7 @@ $(ARROW_CLONED):
 
 $(ARROW_BUILT): $(ARROW_CLONED)
 	@echo "Build Apache Arrow"
-	rm -rf $(ARROW_BUILD_DIR)
+	find $(ARROW_BUILD_DIR) -mindepth 1 -delete 2>/dev/null || true
 	mkdir -p $(ARROW_BUILD_DIR)
 	cd $(ARROW_BUILD_DIR) && \
 	cmake .. \
@@ -118,7 +118,7 @@ $(ARROW_BUILT): $(ARROW_CLONED)
 
 $(ARROW_INSTALLED): $(ARROW_BUILT)
 	@echo "Install Apache Arrow"
-	rm -rf $(ARROW_INSTALL_DIR)
+	find $(ARROW_INSTALL_DIR) -mindepth 1 -delete 2>/dev/null || true
 	cd $(ARROW_BUILD_DIR) && \
 	ninja -j$(shell getconf _NPROCESSORS_ONLN) && \
 	ninja install
@@ -135,7 +135,7 @@ $(GRAPHAR_CLONED): $(ARROW_INSTALLED)
 
 $(GRAPHAR_BUILT): $(GRAPHAR_CLONED)
 	@echo "Build Apache GraphAr"
-	rm -rf $(GRAPHAR_BUILD_DIR)
+	find $(GRAPHAR_BUILD_DIR) -mindepth 1 -delete 2>/dev/null || true
 	mkdir -p $(GRAPHAR_BUILD_DIR)
 	cd $(GRAPHAR_BUILD_DIR) && \
 	cmake .. \
@@ -151,7 +151,7 @@ $(GRAPHAR_BUILT): $(GRAPHAR_CLONED)
 
 $(GRAPHAR_INSTALLED): $(GRAPHAR_BUILT)
 	@echo "Install Apache GraphAr"
-	rm -rf $(GRAPHAR_INSTALL_DIR)
+	find $(GRAPHAR_INSTALL_DIR) -mindepth 1 -delete 2>/dev/null || true
 	cd $(GRAPHAR_BUILD_DIR) && \
 	ninja -j$(shell getconf _NPROCESSORS_ONLN) && \
 	ninja install
