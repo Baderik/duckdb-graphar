@@ -37,21 +37,12 @@ public:
         DUCKDB_GRAPHAR_LOG_TRACE("TwoHopLocalTableFunctionState::MoveReader");
         std::lock_guard<std::mutex> lock(gstate.lock);
 
-        DUCKDB_GRAPHAR_LOG_DEBUG(
-            "TwoHopLocalTableFunctionState::MoveReader - vertexes size=" + std::to_string(gstate.vertexes.size()) +
-            " cur_idx=" + std::to_string(cur_idx) + " gstate.cur_idx=" + std::to_string(gstate.cur_idx) +
-            " next_hop_idx=" + std::to_string(gstate.next_hop_idx));
-
         if (!gstate.vertexes.empty()) {
             cur_idx = gstate.cur_idx++;
-            auto vid = gstate.vertexes.front();
-            DUCKDB_GRAPHAR_LOG_DEBUG("TwoHopLocalTableFunctionState::MoveReader - processing vid=" +
-                                     std::to_string(vid));
-            reader->SetVertex(vid);
+            reader->SetVertex(gstate.vertexes.front());
             gstate.vertexes.pop();
             in_progress = true;
         } else {
-            DUCKDB_GRAPHAR_LOG_DEBUG("TwoHopLocalTableFunctionState::MoveReader - no more vertexes, finishing");
             in_progress = false;
         }
     }
@@ -64,13 +55,13 @@ public:
 class TwoHop {
 public:
     static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
-                                         vector<LogicalType>& return_types, vector<Identifier>& names);
+                                         vector<LogicalType>& return_types, vector<string>& names);
     static unique_ptr<FunctionData> BindEdgeTable(ClientContext& context, TableFunctionBindInput& input,
-                                                  vector<LogicalType>& return_types, vector<Identifier>& names);
+                                                  vector<LogicalType>& return_types, vector<string>& names);
     static unique_ptr<FunctionData> BindGraphInfoPath(ClientContext& context, TableFunctionBindInput& input,
-                                                      vector<LogicalType>& return_types, vector<Identifier>& names);
+                                                      vector<LogicalType>& return_types, vector<string>& names);
     static unique_ptr<FunctionData> BindFinish(ClientContext& context, TableFunctionBindInput& input,
-                                               vector<LogicalType>& return_types, vector<Identifier>& names,
+                                               vector<LogicalType>& return_types, vector<string>& names,
                                                unique_ptr<TwoHopBindData> bind_data);
     static unique_ptr<GlobalTableFunctionState> Init(ClientContext& context, TableFunctionInitInput& input);
     static unique_ptr<LocalTableFunctionState> InitLocal(ExecutionContext& context, TableFunctionInitInput& input,

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <duckdb/common/exception.hpp>
-#include <duckdb/common/identifier.hpp>
 #include <duckdb/common/types.hpp>
 #include <duckdb/common/types/value.hpp>
 
@@ -27,7 +25,7 @@ struct GraphArSettings {
     template <typename T>
     static T get(const ClientContext& context, const std::string& name) {
         Value result;
-        (void)context.TryGetCurrentSetting(Identifier(name), result);
+        (void)context.TryGetCurrentSetting(name, result);
         if (!result.IsNull()) {
             return !result.IsNull() && result.GetValue<T>();
         }
@@ -35,41 +33,5 @@ struct GraphArSettings {
     }
 
     static bool is_time_logging(const ClientContext& context) { return get<bool>(context, "graphar_time_logging"); }
-
-    // Whether duckdb-graphar should read data files with DuckDB's own parquet
-    // reader, or with Arrow's reader. "auto" (default) uses DuckDB for parquet
-    // and Arrow for everything else. "duckdb" forces DuckDB (errors on non-parquet).
-    // "arrow" forces Arrow (works for all file types).
-    static std::string internal_reader_type(const ClientContext& context) {
-        Value result;
-        (void)context.TryGetCurrentSetting(Identifier("graphar_internal_reader_type"), result);
-        if (!result.IsNull()) {
-            auto str = result.GetValue<std::string>();
-            if (str == "auto" || str == "duckdb" || str == "arrow") {
-                return str;
-            }
-            throw InvalidInputException(
-                "graphar_internal_reader_type must be one of: 'auto', 'duckdb', 'arrow'. Got: %s", str);
-        }
-        return "auto";
-    }
-
-    // Decides, per data file, whether DuckDB's reader or Arrow's reader is used.
-    // See internal_reader_type() above for the meaning of each mode.
-    static bool use_duck_reader(const ClientContext& context, bool is_parquet) {
-        const auto mode = internal_reader_type(context);
-        if (mode == "duckdb") {
-            if (!is_parquet) {
-                throw InvalidInputException(
-                    "graphar_internal_reader_type='duckdb' is only supported for parquet files, but the target file "
-                    "type is not PARQUET. Use 'auto' or 'arrow'.");
-            }
-            return true;
-        }
-        if (mode == "arrow") {
-            return false;
-        }
-        return is_parquet;  // 'auto'
-    }
 };
 }  // namespace duckdb

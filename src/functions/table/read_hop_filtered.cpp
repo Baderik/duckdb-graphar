@@ -27,7 +27,7 @@ namespace duckdb {
 // Bind
 //-------------------------------------------------------------------
 unique_ptr<FunctionData> ReadHopFiltered::Bind(ClientContext& context, TableFunctionBindInput& input,
-                                               vector<LogicalType>& return_types, vector<Identifier>& names) {
+                                               vector<LogicalType>& return_types, vector<string>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHopFiltered::Bind");
     const bool is_catalog_mode = HopBase::IsCatalogMode(input);
 
@@ -49,7 +49,7 @@ unique_ptr<FunctionData> ReadHopFiltered::Bind(ClientContext& context, TableFunc
                           {SRC_GID_COLUMN, DST_GID_COLUMN});
     bind_data.reset(static_cast<ReadHopFilteredBindData*>(base_bind_data.release()));
 
-    names = StringsToIdentifiers(bind_data->GetFlattenPropNames());
+    names = bind_data->GetFlattenPropNames();
     const auto& fpt = bind_data->GetFlattenPropTypes();
     std::transform(fpt.begin(), fpt.end(), std::back_inserter(return_types),
                    [](const auto& return_type) { return GraphArFunctions::graphArT2duckT(return_type); });
@@ -108,12 +108,12 @@ void ReadHopFiltered::PushdownComplexFilter(ClientContext& context, LogicalGet& 
 // GetFunction
 //-------------------------------------------------------------------
 TableFunctionSet ReadHopFiltered::GetFunctions() {
-    TableFunctionSet read_hop_filtered((Identifier(GetFunctionName())));
+    TableFunctionSet read_hop_filtered(GetFunctionName());
 
-    TableFunction read_hop_default("", {LogicalType::VARCHAR}, Execute, Bind);
+    TableFunction read_hop_defalt({LogicalType::VARCHAR}, Execute, Bind);
 
-    SetTableFuncionParams(read_hop_default);
-    read_hop_filtered.AddFunction(read_hop_default);
+    SetTableFuncionParams(read_hop_defalt);
+    read_hop_filtered.AddFunction(read_hop_defalt);
 
     return read_hop_filtered;
 }
@@ -121,7 +121,7 @@ TableFunctionSet ReadHopFiltered::GetFunctions() {
 // GetScanFunction
 //-------------------------------------------------------------------
 TableFunction ReadHopFiltered::GetScanFunction() {
-    TableFunction read_hop("", {}, Execute, Bind);
+    TableFunction read_hop(GetFunctionName(), {}, Execute, Bind);
     SetTableFuncionParams(read_hop);
 
     return read_hop;
@@ -386,7 +386,7 @@ void ReadHopFiltered::Execute(ClientContext& context, TableFunctionInput& input,
         }
     }
 
-    output.SetChildCardinality(num_rows);
+    output.SetCapacity(num_rows);
     output.SetCardinality(num_rows);
     gstate.total_rows += num_rows;
     gstate.chunk_count++;

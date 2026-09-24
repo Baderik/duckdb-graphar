@@ -19,7 +19,7 @@ class GraphArCatalog : public Catalog {
 public:
     explicit GraphArCatalog(AttachedDatabase& db_p, const std::string& path_,
                             std::shared_ptr<graphar::GraphInfo>& graph_info_, ClientContext& context,
-                            const std::string& database_name);
+                            std::string& database_name);
     ~GraphArCatalog();
     static inline const string TYPE = "graphar";
 

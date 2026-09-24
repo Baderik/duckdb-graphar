@@ -7,7 +7,6 @@
 
 #include <duckdb/catalog/catalog_search_path.hpp>
 #include <duckdb/common/exception/transaction_exception.hpp>
-#include <duckdb/common/identifier.hpp>
 #include <duckdb/parser/parsed_data/create_schema_info.hpp>
 #include <duckdb/parser/parsed_data/create_table_info.hpp>
 #include <duckdb/storage/database_size.hpp>
@@ -18,14 +17,14 @@
 namespace duckdb {
 GraphArCatalog::GraphArCatalog(AttachedDatabase& db_p, const std::string& path_,
                                std::shared_ptr<graphar::GraphInfo>& graph_info_, ClientContext& context,
-                               const std::string& database_name)
+                               std::string& database_name)
     : Catalog(db_p),
       path(path_),
       graph_info(graph_info_),
       client_data(ClientData::Get(context)),
       database_name(database_name) {
     DUCKDB_GRAPHAR_LOG_TRACE("GraphArCatalog::GraphArCatalog");
-    CatalogSearchEntry entry(Identifier(database_name), Identifier("main"));
+    CatalogSearchEntry entry(database_name, "main");
     client_data.catalog_search_path->Set({entry}, CatalogSetPathType::SET_DIRECTLY);
 }
 
