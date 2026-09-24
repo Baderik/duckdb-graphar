@@ -9,7 +9,7 @@ THIRD_PARTY_DIR=$(PROJ_DIR)third_party
 THIRD_PARTY_CMAKE=$(PROJ_DIR)third_party/extension_deps.cmake
 
 ARROW_REP=https://github.com/apache/arrow.git
-ARROW_VERSION=19.0.1
+ARROW_VERSION=23.0.0
 ARROW_DIR=$(THIRD_PARTY_DIR)/arrow
 ARROW_INSTALL_DIR=$(ARROW_DIR)/install
 ARROW_SRC_DIR=$(ARROW_DIR)/src
@@ -19,7 +19,7 @@ ARROW_BUILT = $(ARROW_DIR)/.built
 ARROW_INSTALLED = $(ARROW_DIR)/.installed
 
 GRAPHAR_REP=https://github.com/lithium-tech/incubator-graphar.git
-GRAPHAR_COMMIT=2fc1fcf2faed6259a72fb47f14585a09cd162f32
+GRAPHAR_COMMIT=8a4c3c9633b5e130812c5cb79171beebdcc4ad42
 GRAPHAR_DIR=$(THIRD_PARTY_DIR)/graphar
 GRAPHAR_INSTALL_DIR=$(GRAPHAR_DIR)/install
 GRAPHAR_SRC_DIR=$(GRAPHAR_DIR)/src
