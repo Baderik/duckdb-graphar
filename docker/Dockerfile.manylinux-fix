@@ -1,0 +1,43 @@
+# Wrapper that fixes the manylinux_2_28 base image for local builds.
+#
+# The stock extension-ci-tools Dockerfile does `yum groupinstall Development
+# Tools`, but AlmaLinux 8 (base of manylinux_2_28) is EOL and its repos (active,
+# vault) return SSL errors / 503 / 404. However manylinux_2_28 ALREADY ships
+# gcc 14.2, cmake 4.4, git, make and a bundled python 3.12 with pip. So we
+# avoid yum entirely: ninja comes from pip, ccache is skipped (it is only a
+# build-speed optimization, not required for correctness).
+FROM quay.io/pypa/manylinux_2_28_x86_64
+
+# TCS corporate CA bundle (exported from the Colima VM), so pip/curl trust the
+# corporate MITM proxy for pypi.org etc.
+ADD ca-bundle.crt /etc/ssl/certs/ca-certificates.crt
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+ENV PIP_CERT=/etc/ssl/certs/ca-certificates.crt
+
+# Manylinux base already has gcc/g++, cmake 4.4, git, make, curl, unzip, tar.
+# Install ninja via the bundled python's pip.
+RUN /opt/python/cp312-cp312/bin/pip3 install -q ninja
+
+# Make python/pip/ninja available on PATH.
+ENV PATH="/opt/python/cp312-cp312/bin:${PATH}"
+
+# Common environment variables (matching extension-ci-tools).
+ENV GEN=ninja
+ENV VCPKG_ROOT=/vcpkg
+ENV VCPKG_TOOLCHAIN_PATH=/vcpkg/scripts/buildsystems/vcpkg.cmake
+ENV PATH="${VCPKG_ROOT}:${PATH}"
+
+# Where the extension is mounted / built.
+VOLUME /duckdb_build_dir
+WORKDIR /duckdb_build_dir
+
+# Allow git access to the mounted volume.
+RUN git config --global --add safe.directory "*"
+
+# ccache mount (ccache itself is optional; if absent builds still work).
+VOLUME /ccache_dir
+ENV CCACHE_DIR=/ccache_dir
+ENV CCACHE_COMPRESS=TRUE
+ENV CCACHE_COMPRESSLEVEL=6
+ENV CCACHE_MAXSIZE=400M
