@@ -14,6 +14,7 @@
 #include "storage/graphar_storage.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
+#include "utils/pua_init.hpp"
 
 #include <duckdb/common/exception.hpp>
 #include <duckdb/common/string_util.hpp>
@@ -39,22 +40,36 @@ static void FinalizeS3(DataChunk& args, ExpressionState& state, Vector& result) 
 }
 
 static void LoadInternal(ExtensionLoader& loader) {
+    auto& config = DBConfig::GetConfig(loader.GetDatabaseInstance());
+
+    config.AddExtensionOption("graphar_time_logging", "Enable time logging for GraphAr requests.", LogicalType::BOOLEAN,
+                              Value::BOOLEAN(false));
+    config.AddExtensionOption("graphar_use_optimize", "Enable graphar join optimization.", LogicalType::BOOLEAN,
+                              Value::BOOLEAN(false));
+
+    config.AddExtensionOption("graphar_internal_reader_type",
+                              "Internal reader to use for reading graph data files: 'auto' (default, DuckDB for "
+                              "parquet, Arrow otherwise), 'duckdb' (always DuckDB, parquet only), 'arrow' (always "
+                              "Arrow).",
+                              LogicalType::VARCHAR, Value("auto"));
+    config.AddExtensionOption("graphar_pua_sink_jsonl_file_path", "Product usage analytics JSONL spool directory.",
+                              LogicalType::VARCHAR, Value(""));
+    config.AddExtensionOption("graphar_pua_sink_jsonl_file_rotation_size_bytes",
+                              "Product usage analytics segment size in bytes.", LogicalType::UBIGINT,
+                              Value::UBIGINT(16ULL * 1024ULL * 1024ULL));
+    config.AddExtensionOption("graphar_pua_sink_jsonl_file_rotation_interval_seconds",
+                              "Product usage analytics segment age in seconds.", LogicalType::UBIGINT,
+                              Value::UBIGINT(24ULL * 60ULL * 60ULL));
+
+    // Initialize GlobalLogManager before using any logging macros
+    GlobalLogManager::Initialize(loader.GetDatabaseInstance(), duckdb::LogLevel::LOG_WARNING);
+
     auto duckdb_graphar_scalar_function =
         ScalarFunction("duckdb_graphar", {LogicalType::VARCHAR}, LogicalType::VARCHAR, QuackScalarFun);
     loader.RegisterFunction(duckdb_graphar_scalar_function);
 
     auto finalize_s3_function = ScalarFunction("duckdb_graphar_finalize_s3", {}, LogicalType::VARCHAR, FinalizeS3);
     loader.RegisterFunction(finalize_s3_function);
-
-    auto& config = DBConfig::GetConfig(loader.GetDatabaseInstance());
-
-    config.AddExtensionOption("graphar_time_logging", "Enable time logging for GraphAr requests.", LogicalType::BOOLEAN,
-                              Value::BOOLEAN(false));
-
-    config.AddExtensionOption("graphar_use_optimize", "Enable graphar join optimization.", LogicalType::BOOLEAN,
-                              Value::BOOLEAN(false));
-
-    GlobalLogManager::Initialize(loader.GetDatabaseInstance(), duckdb::LogLevel::LOG_WARNING);
 
     ReadVertices::Register(loader);
     ReadEdges::Register(loader);
@@ -82,7 +97,6 @@ std::string DuckdbGrapharExtension::Version() const {
 }
 
 }  // namespace duckdb
-
 extern "C" {
 DUCKDB_CPP_EXTENSION_ENTRY(duckdb_graphar, loader) { duckdb::LoadInternal(loader); }
 }

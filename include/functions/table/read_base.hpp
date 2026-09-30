@@ -4,14 +4,17 @@
 #include "readers/duck_arrow_chunk_reader.hpp"
 #include "readers/duck_chunk_reader.hpp"
 #include "readers/duck_read_edges_reader.hpp"
+#include "usage_analytics/usage_analytics.h"
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
+#include "utils/pua_init.hpp"
 #include "utils/type_info.hpp"
 
 #include <arrow/c/bridge.h>
 
 #include <duckdb/common/named_parameter_map.hpp>
+#include <duckdb/execution/expression_executor.hpp>
 #include <duckdb/function/table/arrow.hpp>
 #include <duckdb/function/table_function.hpp>
 #include <duckdb/main/extension/extension_loader.hpp>
@@ -233,11 +236,15 @@ struct ColumnStats {
 class ReadBindData : public TableFunctionData {
 public:
     ReadBindData() = default;
+    virtual ~ReadBindData() = default;
     vector<std::string> GetParams() { return params; }
     const vector<std::string>& GetFlattenPropNames() const { return flatten_prop_names; }
     const vector<std::string>& GetFlattenPropTypes() const { return flatten_prop_types; }
     const std::shared_ptr<graphar::GraphInfo>& GetGraphInfo() const { return graph_info; }
     const std::unordered_map<std::string, ColumnStats>& GetStatsMap() const { return stats_map; }
+
+    virtual std::string GetTableName() const { return table_name_; }
+    void SetTableName(std::string table_name) { this->table_name_ = std::move(table_name); }
 
 private:
     vector<vector<std::string>> prop_names;
@@ -245,6 +252,7 @@ private:
     vector<vector<std::string>> prop_types;
     vector<std::string> flatten_prop_types;
     std::shared_ptr<graphar::GraphInfo> graph_info;
+    std::string table_name_;
     std::string function_name;
     vector<std::string> params;
     graphar::PropertyGroupVector pgs;
@@ -588,7 +596,7 @@ public:
     }
 
     static unique_ptr<FunctionData> Bind(ClientContext& context, TableFunctionBindInput& input,
-                                         vector<LogicalType>& return_types, vector<string>& names) {
+                                         vector<LogicalType>& return_types, vector<Identifier>& names) {
         return ReadFinal::Bind(context, input, return_types, names);
     }
 
@@ -651,6 +659,8 @@ public:
 
         ScopedTimer t("StateInit");
 
+        auto& bind_data_ref = input.bind_data->Cast<ReadBindData>();
+        const auto table_name = bind_data_ref.GetTableName();
         auto bind_data = input.bind_data->Cast<ReadBindData>();
 
         DUCKDB_GRAPHAR_LOG_TRACE(bind_data.function_name + "::Init");
@@ -672,6 +682,23 @@ public:
         gstate.type_info = bind_data.type_info;
         gstate.graph_info = bind_data.graph_info;
         gstate.params = bind_data.params;
+
+        boost::json::object payload;
+        payload["function"] = bind_data.function_name;
+        boost::json::array params;
+        for (const auto& param : bind_data.params) {
+            params.push_back(boost::json::value(param));
+        }
+        payload["params"] = std::move(params);
+        if (!table_name.empty()) {
+            payload["table"] = table_name;
+        }
+        usage_analytics::EnsureInitialized(context);
+        auto& tracker = analytics::usage_analytics::Tracker::GetInstance();
+        const auto process_id = std::string(tracker.common_fields().at("process_id").as_string());
+        tracker.emit(
+            analytics::usage_analytics::MakeQuerySession(process_id, usage_analytics::GetActiveQueryId(context)),
+            analytics::usage_analytics::EventCode::Event, std::move(payload));
 
         const auto prop_types_size = bind_data.prop_types.size();
         vector<idx_t> columns_pref_num(prop_types_size + 1);
@@ -847,7 +874,6 @@ public:
             }
         }
 
-        output.SetCapacity(num_rows);
         output.SetCardinality(num_rows);
         gstate.total_rows += num_rows;
         // DUCKDB_GRAPHAR_LOG_DEBUG("Size of chunk: " + std::to_string(num_rows) +
@@ -888,18 +914,20 @@ public:
             bool can_pushdown = false;
 
             // Case 0: equality comparison (col = value)
-            if (filter->GetExpressionClass() == ExpressionClass::BOUND_COMPARISON) {
-                auto& comparison = filter->Cast<BoundComparisonExpression>();
-                if (comparison.GetExpressionType() == ExpressionType::COMPARE_EQUAL) {
-                    bool left_is_scalar = comparison.left->IsFoldable();
-                    bool right_is_scalar = comparison.right->IsFoldable();
+            if (filter->GetExpressionClass() == ExpressionClass::BOUND_FUNCTION &&
+                BoundComparisonExpression::IsComparison(*filter)) {
+                auto& comp_expr = filter->Cast<BoundFunctionExpression>();
+                if (comp_expr.GetExpressionType() == ExpressionType::COMPARE_EQUAL) {
+                    auto& left = BoundComparisonExpression::Left(comp_expr);
+                    auto& right = BoundComparisonExpression::Right(comp_expr);
+                    bool left_is_scalar = left.IsFoldable();
+                    bool right_is_scalar = right.IsFoldable();
                     if (left_is_scalar || right_is_scalar) {
-                        auto column_name = comparison.left->ToString();
+                        bool column_on_left = left.GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF;
+                        auto column_name = column_on_left ? left.ToString() : right.ToString();
                         Value val;
 
-                        auto& scalar_expr = (comparison.left->GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF)
-                                                ? *comparison.right
-                                                : *comparison.left;
+                        auto& scalar_expr = column_on_left ? right : left;
 
                         if (!ExpressionExecutor::TryEvaluateScalar(context, scalar_expr, val)) {
                             continue;
@@ -916,14 +944,14 @@ public:
             // Case 1: list_contains([1, 2, 3], col) -- list literal
             if (!can_pushdown && filter->GetExpressionClass() == ExpressionClass::BOUND_FUNCTION) {
                 auto& op_expr = filter->Cast<BoundFunctionExpression>();
-                const auto& fname = op_expr.function.name;
+                const auto& fname = op_expr.Function().GetName().GetIdentifierName();
                 if (fname == "contains" || fname == "list_contains" || fname == "array_contains" ||
                     fname == "list_has" || fname == "array_has") {
-                    if (op_expr.children.size() == 2 &&
-                        op_expr.children[0]->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
-                        auto& const_expr = op_expr.children[0]->Cast<BoundConstantExpression>();
-                        auto column_name = op_expr.children[1]->ToString();
-                        auto& list_value = const_expr.value;
+                    auto& children = op_expr.GetChildren();
+                    if (children.size() == 2 && children[0]->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
+                        auto& const_expr = children[0]->Cast<BoundConstantExpression>();
+                        auto column_name = children[1]->ToString();
+                        auto& list_value = const_expr.GetValue();
 
                         if (list_value.type().id() == LogicalTypeId::LIST) {
                             auto list_children = ListValue::GetChildren(list_value);
@@ -944,12 +972,13 @@ public:
             if (!can_pushdown && filter->GetExpressionClass() == ExpressionClass::BOUND_OPERATOR &&
                 filter->GetExpressionType() == ExpressionType::COMPARE_IN) {
                 auto& op_expr = filter->Cast<BoundOperatorExpression>();
-                if (op_expr.children[0]->GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF) {
-                    auto column_name = op_expr.children[0]->ToString();
+                auto& children = op_expr.GetChildren();
+                if (children[0]->GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF) {
+                    auto column_name = children[0]->ToString();
                     bool any = false;
-                    for (idx_t i = 1; i < op_expr.children.size(); i++) {
-                        if (op_expr.children[i]->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
-                            auto& cv = op_expr.children[i]->Cast<BoundConstantExpression>().value;
+                    for (idx_t i = 1; i < children.size(); i++) {
+                        if (children[i]->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
+                            auto& cv = children[i]->Cast<BoundConstantExpression>().GetValue();
                             if (validate_wrapper(column_name, cv)) any = true;
                         }
                     }
@@ -969,23 +998,26 @@ public:
                 std::vector<Value> local_vals;
                 bool valid = true;
 
-                for (auto& child : conj.children) {
-                    if (child->GetExpressionClass() != ExpressionClass::BOUND_COMPARISON ||
+                for (auto& child : conj.GetChildren()) {
+                    if (child->GetExpressionClass() != ExpressionClass::BOUND_FUNCTION ||
+                        !BoundComparisonExpression::IsComparison(*child) ||
                         child->GetExpressionType() != ExpressionType::COMPARE_EQUAL) {
                         valid = false;
                         break;
                     }
-                    auto& cmp = child->Cast<BoundComparisonExpression>();
+                    auto& comp_expr = child->Cast<BoundFunctionExpression>();
                     std::string col;
                     Value val;
-                    if (cmp.left->GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF &&
-                        cmp.right->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
-                        col = cmp.left->ToString();
-                        val = cmp.right->Cast<BoundConstantExpression>().value;
-                    } else if (cmp.right->GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF &&
-                               cmp.left->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
-                        col = cmp.right->ToString();
-                        val = cmp.left->Cast<BoundConstantExpression>().value;
+                    auto& left = BoundComparisonExpression::Left(comp_expr);
+                    auto& right = BoundComparisonExpression::Right(comp_expr);
+                    if (left.GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF &&
+                        right.GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
+                        col = left.ToString();
+                        val = right.Cast<BoundConstantExpression>().GetValue();
+                    } else if (right.GetExpressionClass() == ExpressionClass::BOUND_COLUMN_REF &&
+                               left.GetExpressionClass() == ExpressionClass::BOUND_CONSTANT) {
+                        col = right.ToString();
+                        val = left.Cast<BoundConstantExpression>().GetValue();
                     } else {
                         valid = false;
                         break;

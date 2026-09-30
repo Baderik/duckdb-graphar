@@ -35,7 +35,7 @@ void ReadVertices::SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info,
 // Bind
 //-------------------------------------------------------------------
 unique_ptr<FunctionData> ReadVertices::Bind(ClientContext& context, TableFunctionBindInput& input,
-                                            vector<LogicalType>& return_types, vector<string>& names) {
+                                            vector<LogicalType>& return_types, vector<Identifier>& names) {
     bool time_logging = GraphArSettings::is_time_logging(context);
 
     ScopedTimer t("Bind");
@@ -63,8 +63,9 @@ unique_ptr<FunctionData> ReadVertices::Bind(ClientContext& context, TableFunctio
     DUCKDB_GRAPHAR_LOG_DEBUG("Fill bind data");
 
     SetBindData(graph_info, vertex_info, bind_data);
+    bind_data->SetTableName(file_path);
 
-    names = bind_data->flatten_prop_names;
+    names = StringsToIdentifiers(bind_data->flatten_prop_names);
     std::transform(bind_data->flatten_prop_types.begin(), bind_data->flatten_prop_types.end(),
                    std::back_inserter(return_types),
                    [](const auto& return_type) { return GraphArFunctions::graphArT2duckT(return_type); });
@@ -88,7 +89,9 @@ BaseReaderPtr ReadVertices::GetBaseReader(ClientContext& context, ReadBaseGlobal
         throw InternalException("Failed to get vertex info");
     }
     const auto& prefix = gstate.graph_info->GetPrefix();
-    if (gstate.pgs[ind]->GetFileType() == graphar::FileType::PARQUET) {
+    const bool is_parquet = gstate.pgs[ind]->GetFileType() == graphar::FileType::PARQUET;
+    const bool use_duck = GraphArSettings::use_duck_reader(context, is_parquet);
+    if (use_duck) {
         DUCKDB_GRAPHAR_LOG_DEBUG("Making duckdb reader");
         return ConvertBaseReader(graphar::VertexPropertyChunkInfoReader::Make(vertex_info, gstate.pgs[ind], prefix),
                                  counter);
@@ -130,7 +133,9 @@ ReaderPtr ReadVertices::GetReader(ClientContext& context, ReadBaseGlobalTableFun
         throw InternalException("Failed to get vertex info");
     }
     const auto& prefix = gstate.graph_info->GetPrefix();
-    if (gstate.pgs[ind]->GetFileType() == graphar::FileType::PARQUET) {
+    const bool is_parquet = gstate.pgs[ind]->GetFileType() == graphar::FileType::PARQUET;
+    const bool use_duck = GraphArSettings::use_duck_reader(context, is_parquet);
+    if (use_duck) {
         DUCKDB_GRAPHAR_LOG_DEBUG("Making duckdb reader");
         std::vector<std::shared_ptr<graphar::TSVertexPropertyChunkInfoReader>> base_readers;
         base_readers.reserve(gstate.base_readers[ind].size());
@@ -198,7 +203,7 @@ static void InitFunction(TableFunction& read_vertices) {
 // GetFunction
 //-------------------------------------------------------------------
 TableFunction ReadVertices::GetFunction() {
-    TableFunction read_vertices(GetFunctionName(), {LogicalType::VARCHAR}, Execute, Bind);
+    TableFunction read_vertices(Identifier(GetFunctionName()), {LogicalType::VARCHAR}, Execute, Bind);
     InitFunction(read_vertices);
 
     read_vertices.named_parameters["type"] = LogicalType::VARCHAR;

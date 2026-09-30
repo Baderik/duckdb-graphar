@@ -1,13 +1,14 @@
-log_stage("tablefunctions")
-add_library_unity(test_table_functions OBJECT test_read_vertices.cpp test_read_edges.cpp test_shortest_path.cpp)
+add_library_unity(test_table_functions OBJECT test_read_vertices.cpp test_read_edges.cpp test_shortest_path.cpp test_graphar_func.cpp)
 add_dependencies(test_table_functions graphar)
 target_include_directories(test_table_functions PRIVATE
     ${GRAPHAR_INSTALL_DIR}/include
     ${GRAPHAR_SOURCE_DIR}/cpp/thirdparty
     ${ARROW_INSTALL_DIR}/include
     ${EXTENSION_ROOT_DIR}/include
+    ${EXTENSION_ROOT_DIR}/analytics/usage_analytics/include
+    ${Boost_INCLUDE_DIRS}
     ${CATCH2_INCLUDE_DIRS}
-    ${EXTENSION_ROOT_DIR}/tests/fixture
+    ${EXTENSION_ROOT_DIR}/test/cpp/fixture
 )
 set(ALL_OBJECT_FILES
     ${ALL_OBJECT_FILES} $<TARGET_OBJECTS:test_table_functions>

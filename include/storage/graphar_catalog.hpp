@@ -1,5 +1,7 @@
 #pragma once
 
+#include "usage_analytics/usage_analytics.h"
+
 #include <duckdb/catalog/catalog.hpp>
 #include <duckdb/catalog/entry_lookup_info.hpp>
 #include <duckdb/common/common.hpp>
@@ -19,12 +21,13 @@ class GraphArCatalog : public Catalog {
 public:
     explicit GraphArCatalog(AttachedDatabase& db_p, const std::string& path_,
                             std::shared_ptr<graphar::GraphInfo>& graph_info_, ClientContext& context,
-                            std::string& database_name);
+                            const std::string& database_name);
     ~GraphArCatalog();
     static inline const string TYPE = "graphar";
 
 public:
     void Initialize(bool load_builtin) override;
+    void OnDetach(ClientContext& context) override;
     string GetCatalogType() override { return TYPE; }
 
     optional_ptr<CatalogEntry> CreateSchema(CatalogTransaction transaction, CreateSchemaInfo& info) override;

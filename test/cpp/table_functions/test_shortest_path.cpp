@@ -34,7 +34,7 @@ TEST_CASE("ShortestPath GetFunction basic test", "[shortest_path]") {
     TableFunction shortest_path_func;
     REQUIRE_NOTHROW(shortest_path_func = ShortestPath::GetFunction());
     
-    REQUIRE(shortest_path_func.name == "shortest_path");
+    REQUIRE(shortest_path_func.GetName() == "shortest_path");
     REQUIRE(shortest_path_func.arguments.size() == 3);
     REQUIRE(shortest_path_func.named_parameters.size() == 3);
     CHECK(shortest_path_func.filter_pushdown == false);
@@ -62,7 +62,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -73,7 +73,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -95,11 +97,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 2); // step 0: vertex 1, step 1: vertex 2
@@ -131,7 +133,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -142,7 +144,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -164,11 +168,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 3); // step 0: vertex 1, step 1: vertex 2, step 2: vertex 4
@@ -202,7 +206,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -213,7 +217,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -235,11 +241,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 1); // step 0: vertex 1
@@ -269,7 +275,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -280,7 +286,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -302,11 +310,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 0); // No path exists
@@ -330,7 +338,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -341,7 +349,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -363,11 +373,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 0); // No path exists between disconnected components
@@ -390,7 +400,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -401,7 +411,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -423,11 +435,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 3); // step 0: vertex 0, step 1: vertex 1, step 2: vertex 2
@@ -460,7 +472,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -471,7 +483,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -493,11 +507,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 0);
@@ -519,7 +533,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -530,7 +544,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -552,11 +568,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 0);
@@ -578,7 +594,7 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     auto bind_input = TestFixture::CreateMockBindInput(inputs, named_parameters, input_table_types);
 
     vector<LogicalType> return_types;
-    vector<std::string> names;
+    vector<Identifier> names;
     INFO("Finish mocking");
 
     TableFunction shortest_path_func = ShortestPath::GetFunction();
@@ -589,7 +605,9 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     REQUIRE_NOTHROW(bind_data = shortest_path_func.bind(*TestFixture::conn.context, bind_input, return_types, names));
 
     REQUIRE(bind_data != nullptr);
-    REQUIRE(names == vector<std::string>({"step_number", "_graphArVertexIndex"}));
+    REQUIRE(names.size() == 2);
+    REQUIRE(names[0].GetIdentifierName() == "step_number");
+    REQUIRE(names[1].GetIdentifierName() == "_graphArVertexIndex");
     REQUIRE(return_types == vector<LogicalType>({LogicalType::BIGINT, LogicalType::BIGINT}));
     INFO("Finish bind test");
 
@@ -611,11 +629,11 @@ TEMPLATE_TEST_CASE_METHOD(TableFunctionsFixture, "ShortestPath Bind and Execute 
     INFO("Execute test");
     REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     while (tmp.size() > 0){
-        res.Append(tmp, true);
+        res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
         tmp.Reset();
         REQUIRE_NOTHROW(shortest_path_func.function(*TestFixture::conn.context, func_input, tmp));
     }
-    if(tmp.size() > 0) res.Append(tmp, true);
+    if(tmp.size() > 0) res.Append(tmp, VectorAppendMode::ALLOW_RESIZE);
 
     INFO("Checking results");
     REQUIRE(res.size() == 0);

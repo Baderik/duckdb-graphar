@@ -3,11 +3,11 @@ set -euxo pipefail
 # === Get Directory Paths ===
 ROOT_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")
 
-DEPS_DIR=$ROOT_DIR/build/_deps
-ARROW_INSTALL_DIR=$DEPS_DIR/arrow-install
-ARROW_BUILD_DIR=$DEPS_DIR/arrow-prefix/src/arrow-build
-PROTOBUF_INSTALL_DIR=$ARROW_BUILD_DIR/protobuf_ep-install
-GRAPHAR_CLI_DIR=$DEPS_DIR/graphar-prefix/src/graphar/cli
+THIRD_PARTY_DIR=$ROOT_DIR/third_party
+ARROW_INSTALL_DIR=$THIRD_PARTY_DIR/arrow/install
+ARROW_BUILD_DIR=$THIRD_PARTY_DIR/arrow/src/cpp/build
+PROTOBUF_INSTALL_DIR=$ARROW_BUILD_DIR/_deps/protobuf-src/src
+GRAPHAR_CLI_DIR=$THIRD_PARTY_DIR/graphar/src/cli
 
 # === Build CMake arguments for pip ===
 CMAKE_ARGS=(
@@ -16,8 +16,9 @@ CMAKE_ARGS=(
   --config-settings=cmake.define.Parquet_DIR="$ARROW_INSTALL_DIR/lib/cmake/Parquet"
   --config-settings=cmake.define.ArrowDataset_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowDataset"
   --config-settings=cmake.define.ArrowAcero_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowAcero"
-  --config-settings=cmake.define.Protobuf_INCLUDE_DIR="$PROTOBUF_INSTALL_DIR/include"
-  --config-settings=cmake.define.Protobuf_LIBRARIES="$PROTOBUF_INSTALL_DIR/lib/libprotobuf.a"
+  --config-settings=cmake.define.ArrowCompute_DIR="$ARROW_INSTALL_DIR/lib/cmake/ArrowCompute"
+  --config-settings=cmake.define.Protobuf_INCLUDE_DIR="$PROTOBUF_INSTALL_DIR"
+  --config-settings=cmake.define.Protobuf_LIBRARIES="$ARROW_BUILD_DIR/_deps/protobuf-build/libprotobuf.a"
 
   # Enable RPATH to link against libraries in install directory
   --config-settings=cmake.define.CMAKE_INSTALL_RPATH_USE_LINK_PATH=ON
