@@ -10,10 +10,10 @@
 #include "duckdb/planner/joinside.hpp"
 #include "duckdb/planner/operator/logical_aggregate.hpp"
 #include "duckdb/planner/operator/logical_comparison_join.hpp"
-#include "duckdb/planner/operator/logical_get.hpp"
-#include "duckdb/planner/operator/logical_projection.hpp"
 #include "duckdb/planner/operator/logical_cte.hpp"
 #include "duckdb/planner/operator/logical_cteref.hpp"
+#include "duckdb/planner/operator/logical_get.hpp"
+#include "duckdb/planner/operator/logical_projection.hpp"
 #include "optimizer/node2string.hpp"
 #include "utils/benchmark.hpp"
 #include "utils/global_log_manager.hpp"
@@ -133,10 +133,11 @@ static void useColumnsInOperator(const LogicalOperator& op, using_col_set& used_
             const size_t exp_size = op.expressions.size();
             // DUCKDB_GRAPHAR_LOG_TRACE("exp_size " + std::to_string(exp_size));
             for (size_t i = 0; i < exp_size; ++i) {
-                // DUCKDB_GRAPHAR_LOG_TRACE("exp_i " + std::to_string(i) + " exp_size " + std::to_string(op.expressions.size()));
+                // DUCKDB_GRAPHAR_LOG_TRACE("exp_i " + std::to_string(i) + " exp_size " +
+                // std::to_string(op.expressions.size()));
                 auto& exp = op.expressions[i];
                 // DUCKDB_GRAPHAR_LOG_TRACE("use exp " + std::to_string(exp != nullptr) + " " +
-                                        //  std::to_string(op.expressions.size()));
+                //  std::to_string(op.expressions.size()));
                 if (exp == nullptr) {
                     DUCKDB_GRAPHAR_LOG_WARN("use exp = nullptr");
                     continue;
@@ -163,7 +164,7 @@ static bool checkVertexTable(const LogicalOperator& op, using_col_set& used_colu
     const auto t_idx = get.table_index.index;
     auto it = used_columns.find(t_idx);
     if (it == used_columns.end()) {
-        return false; // TODO: must be true - unused vertex table so can be skipped, no?
+        return false;  // TODO: must be true - unused vertex table so can be skipped, no?
     }
     if (it->second.size() > 1) {
         return false;
@@ -216,8 +217,7 @@ static OptimizeResult TryOptimizeVertexEdgeJoin(unique_ptr<LogicalOperator>& op,
         }
     }
 
-    if (join.join_type != JoinType::INNER && 
-        !(left_vertex && join.join_type == JoinType::RIGHT) && 
+    if (join.join_type != JoinType::INNER && !(left_vertex && join.join_type == JoinType::RIGHT) &&
         !(!left_vertex && join.join_type == JoinType::LEFT)) {
         return result;
     }
@@ -302,7 +302,7 @@ static OptimizeResult OptimizeJoins(unique_ptr<LogicalOperator>& op, replace_col
         ++i;
         if (op->children[child_i]) {
             // DUCKDB_GRAPHAR_LOG_DEBUG(node_str(op, cur_i, depth) + " go to child child_i=" + std::to_string(child_i) +
-                                    //  " " + node_str(op->children[child_i], i, depth + 1));
+            //  " " + node_str(op->children[child_i], i, depth + 1));
             auto child_result = OptimizeJoins(op->children[child_i], replace_columns, used_columns, i, depth + 1);
             result.optimized = result.optimized || child_result.optimized;
 
@@ -404,7 +404,7 @@ static bool HasGraphArScan(LogicalOperator& op) {
     return false;
 }
 
-static void LoggingWalk(LogicalOperator& op, size_t &lo_i) {
+static void LoggingWalk(LogicalOperator& op, size_t& lo_i) {
     DUCKDB_GRAPHAR_LOG_WARN("LO #" + std::to_string(lo_i) + ":\n" + GetInfoLogical(op) + '\n');
     // if (op.type == LogicalOperatorType::LOGICAL_COMPARISON_JOIN) {
     //     auto& join = op.Cast<LogicalComparisonJoin>();
@@ -422,7 +422,7 @@ static void LoggingWalk(LogicalOperator& op, size_t &lo_i) {
     }
 }
 
-static void LoggingWalk(LogicalOperator& op) { 
+static void LoggingWalk(LogicalOperator& op) {
     size_t lo_i = 0;
     LoggingWalk(op, lo_i);
 }
