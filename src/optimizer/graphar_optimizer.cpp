@@ -216,6 +216,12 @@ static OptimizeResult TryOptimizeVertexEdgeJoin(unique_ptr<LogicalOperator>& op,
         }
     }
 
+    if (join.join_type != JoinType::INNER && 
+        !(left_vertex && join.join_type == JoinType::RIGHT) && 
+        !(!left_vertex && join.join_type == JoinType::LEFT)) {
+        return result;
+    }
+
     result.optimized = true;
 
     DUCKDB_GRAPHAR_LOG_DEBUG("ln: " + left_name + " rn: " + right_name);
