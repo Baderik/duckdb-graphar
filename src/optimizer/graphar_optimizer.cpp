@@ -444,10 +444,10 @@ static void GraphArOptimize(OptimizerExtensionInput& input, unique_ptr<LogicalOp
     const bool hasGraphArScan = HasGraphArScan(*plan);
 
     // DUCKDB_GRAPHAR_LOG_DEBUG("after depth: " + std::to_string(GetOperatorTree(*plan)))
-    std::string tree;
-    GetOperatorTree(*plan, tree);
-    DUCKDB_GRAPHAR_LOG_WARN("after operators: " + tree);
-    DUCKDB_GRAPHAR_LOG_WARN(plan->ToString());
+    // std::string tree;
+    // GetOperatorTree(*plan, tree);
+    // DUCKDB_GRAPHAR_LOG_WARN("after operators: " + tree);
+    // DUCKDB_GRAPHAR_LOG_WARN(plan->ToString());
 
     // LoggingWalk(*plan);
 
@@ -460,17 +460,17 @@ static void GraphArOptimize(OptimizerExtensionInput& input, unique_ptr<LogicalOp
         using_col_set used_columns;
 
         if (OptimizeJoins(plan, replace_columns, used_columns, i).optimized) {
-            DUCKDB_GRAPHAR_LOG_DEBUG("GraphAr Join optimization applied");
+            // DUCKDB_GRAPHAR_LOG_DEBUG("GraphAr Join optimization applied");
             plan->ResolveOperatorTypes();
-            DUCKDB_GRAPHAR_LOG_DEBUG("Final plan:\n" + plan->ToString());
+            // DUCKDB_GRAPHAR_LOG_DEBUG("Final plan:\n" + plan->ToString());
             // LoggingWalk(*plan);
             // DUCKDB_GRAPHAR_LOG_DEBUG("ReplacedMap:\n" + map2str(replace_columns));
         }
-        DUCKDB_GRAPHAR_LOG_WARN("OPTIMIZED");
-        std::string tree;
-        GetOperatorTree(*plan, tree);
-        DUCKDB_GRAPHAR_LOG_WARN("FINAL PLAN\n" + tree);
-        DUCKDB_GRAPHAR_LOG_WARN(plan->ToString());
+        // DUCKDB_GRAPHAR_LOG_WARN("OPTIMIZED");
+        // std::string tree;
+        // GetOperatorTree(*plan, tree);
+        // DUCKDB_GRAPHAR_LOG_WARN("FINAL PLAN\n" + tree);
+        // DUCKDB_GRAPHAR_LOG_WARN(plan->ToString());
         // LoggingWalk(*plan);
     }
 }
