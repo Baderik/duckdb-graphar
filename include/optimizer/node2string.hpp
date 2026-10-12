@@ -11,11 +11,11 @@
 #include "duckdb/planner/joinside.hpp"
 #include "duckdb/planner/operator/logical_aggregate.hpp"
 #include "duckdb/planner/operator/logical_comparison_join.hpp"
-#include "duckdb/planner/operator/logical_get.hpp"
-#include "duckdb/planner/operator/logical_projection.hpp"
-#include "duckdb/planner/operator/logical_filter.hpp"
 #include "duckdb/planner/operator/logical_cteref.hpp"
+#include "duckdb/planner/operator/logical_filter.hpp"
+#include "duckdb/planner/operator/logical_get.hpp"
 #include "duckdb/planner/operator/logical_materialized_cte.hpp"
+#include "duckdb/planner/operator/logical_projection.hpp"
 #include "utils/benchmark.hpp"
 #include "utils/global_log_manager.hpp"
 
@@ -25,13 +25,14 @@ std::string GetStringE(const unique_ptr<Expression>& expr);
 
 std::string LogBound(BoundColumnRefExpression& expr) {
     string result;
-    return ExpressionTypeToString(expr.GetExpressionType()) + ": " + expr.GetName() + " " + expr.binding.ToString();
+    return ExpressionTypeToString(expr.GetExpressionType()) + ": " + expr.GetName() + " " + expr.Binding().ToString();
 }
 
-std::string LogComparison(BoundComparisonExpression& expr) {
-    string result;
-    return ExpressionTypeToString(expr.GetExpressionType()) + ": <" + GetStringE(expr.left) + ">-<" + GetStringE(expr.right) + ">";
-}
+// std::string LogComparison(BoundComparisonExpression& expr) {
+//     string result;
+//     return ExpressionTypeToString(expr.GetExpressionType()) + ": <" + GetStringE(expr.left) + ">-<" +
+//     GetStringE(expr.right) + ">";
+// }
 
 template <typename elT>
 std::string GetStringL(const vector<elT>& elements, std::function<string(const elT&)> format_func) {
@@ -65,9 +66,9 @@ std::string GetStringE(const unique_ptr<Expression>& expr) {
             // 	break;
             case ExpressionClass::BOUND_COLUMN_REF:
                 return LogBound(expr->Cast<BoundColumnRefExpression>());
-            case ExpressionClass::BOUND_COMPARISON:
-            	return LogComparison(expr->Cast<BoundComparisonExpression>());
-            	break;
+            // case ExpressionClass::BOUND_COMPARISON:
+            // 	return LogComparison(expr->Cast<BoundComparisonExpression>());
+            // 	break;
             // case ExpressionClass::BOUND_CONJUNCTION:
             // 	return LogBound(expr->Cast<BoundConjunctionExpression>());
             // 	break;
@@ -153,7 +154,8 @@ std::string GetInfoLogicalOperator(LogicalOperator& op) {
     result += '\n';
 
     result += "HasProjectionMap: " + std::to_string(op.HasProjectionMap()) + '\n';
-    result += "TableIdx: " + GetStringL<idx_t>(op.GetTableIndex(), [](const auto& idx) { return std::to_string(idx); });
+    result += "TableIdx: " +
+              GetStringL<TableIndex>(op.GetTableIndex(), [](const auto& idx) { return std::to_string(idx.index); });
 
     return result;
 }
@@ -161,17 +163,20 @@ std::string GetInfoLogicalOperator(LogicalOperator& op) {
 std::string GetInfoLogicalJoin(LogicalJoin& op) {
     std::string result;
     result += "JoinType: " + JoinTypeToString(op.join_type) + "\n";
-    result += "mark_idx: " + std::to_string(op.mark_index) + "\n";
+    result += "mark_idx: " + std::to_string(op.mark_index.index) + "\n";
     result += "Left proj map: " +
-              GetStringL<idx_t>(op.left_projection_map, [](const auto& idx) { return std::to_string(idx); }) + '\n';
+              GetStringL<ProjectionIndex>(op.left_projection_map,
+                                          [](const auto& idx) { return std::to_string(idx.GetIndex()); }) +
+              '\n';
     result += "Right proj map: " +
-              GetStringL<idx_t>(op.right_projection_map, [](const auto& idx) { return std::to_string(idx); }) + '\n';
-    result += "Join stats: " +
-              GetStringL<unique_ptr<BaseStatistics>>(op.join_stats, [](const auto& stat) { return stat->ToString(); }) +
+              GetStringL<ProjectionIndex>(op.right_projection_map,
+                                          [](const auto& idx) { return std::to_string(idx.GetIndex()); }) +
               '\n';
 
     const auto table_idx = op.GetTableIndex();
-    result += "Table idx: " + GetStringL<idx_t>(table_idx, [](const auto& idx) { return std::to_string(idx); }) + '\n';
+    result +=
+        "Table idx: " + GetStringL<TableIndex>(table_idx, [](const auto& idx) { return std::to_string(idx.index); }) +
+        '\n';
 
     return result;
 }
@@ -182,9 +187,12 @@ std::string GetInfoComparisonJoin(LogicalComparisonJoin& op) {
     result += "Conditions: " +
               GetStringL<duckdb::JoinCondition>(op.conditions,
                                                 [](const auto& cond) {
-                                                    return GetStringE(cond.left) + " " +
-                                                           ExpressionTypeToOperator(cond.comparison) + " " +
-                                                           GetStringE(cond.right);
+                                                    // if (!cond.IsComparison()) {
+                                                    return GetStringE(cond.JoinExpressionReference());
+                                                    // }
+                                                    // return GetStringE(cond.LeftReference()) + " " +
+                                                    //        ExpressionTypeToOperator(cond.GetComparisonType()) + " " +
+                                                    //        GetStringE(cond.RightReference());
                                                 }) +
               '\n';
 
@@ -201,8 +209,6 @@ std::string GetInfoComparisonJoin(LogicalComparisonJoin& op) {
 
     result += GetStringJ(op.filter_pushdown) + '\n';
 
-    result += "Predicate: " + GetStringE(op.predicate) + '\n';
-
     const auto params = op.ParamsToString();
     result += "Params: size=" + std::to_string(params.size()) + " ";
     for (const auto& param : params) {
@@ -215,13 +221,17 @@ std::string GetInfoComparisonJoin(LogicalComparisonJoin& op) {
 
 std::string GetInfoLogicalGet(LogicalGet& op) {
     std::string result;
-    result += "Table index: " + std::to_string(op.table_index) + '\n';
+    result += "Table index: " + std::to_string(op.table_index.index) + '\n';
 
-    result += "Names: " + GetStringL<std::string>(op.names, [](const auto& name) { return name; }) + '\n';
     result +=
-        "Projections: " + GetStringL<idx_t>(op.projection_ids, [](const auto& el) { return std::to_string(el); }) +
+        "Names: " + GetStringL<Identifier>(op.names, [](const auto& name) { return name.GetIdentifierName(); }) + '\n';
+    result +=
+        "Projections: " +
+        GetStringL<ProjectionIndex>(op.projection_ids, [](const auto& el) { return std::to_string(el.GetIndex()); }) +
         '\n';
-    result += "InputTableNames: " + GetStringL<string>(op.input_table_names, [](const auto& el) { return el; }) + '\n';
+    result += "InputTableNames: " +
+              GetStringL<Identifier>(op.input_table_names, [](const auto& el) { return el.GetIdentifierName(); }) +
+              '\n';
     result += "InputTableTypes: " +
               GetStringL<LogicalType>(op.input_table_types, [](const auto& el) { return el.ToString(); }) + '\n';
     result += "Projections input: " +
@@ -232,9 +242,9 @@ std::string GetInfoLogicalGet(LogicalGet& op) {
 
 std::string GetInfoLogicalAggregate(LogicalAggregate& op) {
     std::string result;
-    result += "GroupIdx: " + std::to_string(op.group_index) + '\n';
-    result += "AggregateIdx: " + std::to_string(op.aggregate_index) + '\n';
-    result += "GroupingsIdx: " + std::to_string(op.groupings_index) + '\n';
+    result += "GroupIdx: " + std::to_string(op.group_index.index) + '\n';
+    result += "AggregateIdx: " + std::to_string(op.aggregate_index.index) + '\n';
+    result += "GroupingsIdx: " + std::to_string(op.groupings_index.index) + '\n';
     result +=
         "Groups: " + GetStringL<unique_ptr<Expression>>(op.groups, [](const auto& expr) { return GetStringE(expr); }) +
         '\n';
@@ -254,7 +264,8 @@ std::string GetInfoCorrelatedColumns(CorrelatedColumns& cols) {
     result += "cols: size=" + std::to_string(cols.size()) + '\n';
 
     for (const auto& col : cols) {
-        result += "Binding:" + col.binding.ToString() + ";Type:" + col.type.ToString() + ";Name:" + col.name + ";Depth:" + std::to_string(col.depth) + '\n';
+        result += "Binding:" + col.binding.ToString() + ";Type:" + col.type.ToString() + ";Name:" + col.name +
+                  ";Depth:" + std::to_string(col.depth) + '\n';
     }
     return result;
 }
@@ -262,7 +273,7 @@ std::string GetInfoCorrelatedColumns(CorrelatedColumns& cols) {
 std::string GetInfoLogicalCTE(LogicalCTE& op) {
     std::string result;
     result += "Name: " + op.ctename + '\n';
-    result += "Table index: " + std::to_string(op.table_index) + '\n';
+    result += "Table index: " + std::to_string(op.table_index.index) + '\n';
     result += "Column count: " + std::to_string(op.column_count) + '\n';
     result += GetInfoCorrelatedColumns(op.correlated_columns);
 
@@ -279,7 +290,10 @@ std::string GetInfoLogicalMaterializedCTE(LogicalMaterializedCTE& op) {
 
 std::string GetInfoLogicalFilter(LogicalFilter& op) {
     std::string result;
-    result += "Projection_map: " + GetStringL<idx_t>(op.projection_map, [](const auto& el) { return std::to_string(el); }) + '\n';
+    result +=
+        "Projection_map: " +
+        GetStringL<ProjectionIndex>(op.projection_map, [](const auto& el) { return std::to_string(el.GetIndex()); }) +
+        '\n';
     auto binds = op.GetColumnBindings();
     result += "Bindings: size=" + std::to_string(binds.size()) + " " + op.ColumnBindingsToString(binds) + '\n';
 
@@ -288,10 +302,12 @@ std::string GetInfoLogicalFilter(LogicalFilter& op) {
 
 std::string GetInfoLogicalCteRef(LogicalCTERef& op) {
     std::string result;
-    result += "Bound Columns: " + GetStringL<string>(op.bound_columns, [](const auto& el) { return el; }) + '\n';
-    result += "Table index: " + std::to_string(op.table_index) + '\n';
-    result += "CTE index: " + std::to_string(op.cte_index) + '\n';
-    result += "Chunk Types: " + GetStringL<LogicalType>(op.chunk_types, [](const auto& el) { return el.ToString(); }) + '\n';
+    result += "Bound Columns: " +
+              GetStringL<Identifier>(op.bound_columns, [](const auto& el) { return el.GetIdentifierName(); }) + '\n';
+    result += "Table index: " + std::to_string(op.table_index.index) + '\n';
+    result += "CTE index: " + std::to_string(op.cte_index.index) + '\n';
+    result +=
+        "Chunk Types: " + GetStringL<LogicalType>(op.chunk_types, [](const auto& el) { return el.ToString(); }) + '\n';
     result += "Correlated columns: " + std::to_string(op.correlated_columns) + '\n';
     result += "Is recurring: " + std::to_string(op.is_recurring) + '\n';
 
@@ -363,7 +379,7 @@ std::string GetGraphArFunctionName(const LogicalOperator& op) {
     if (get.function.name != "read_edges" && get.function.name != "read_vertices") {
         return "";
     }
-    return get.function.name;
+    return get.function.name.GetIdentifierName();
 }
 
 std::string node_str(unique_ptr<LogicalOperator>& op, const int i, const int depth) {
