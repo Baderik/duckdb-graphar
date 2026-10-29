@@ -215,6 +215,42 @@ jobs:
               echo "=== system openssl pc (should NOT be used) ==="
               pkg-config --modversion openssl 2>/dev/null || true
               pkg-config --libs --static openssl 2>/dev/null || true
+              # Static libcurl. The system libcurl-devel is dynamic, so the
+              # built extension would need libcurl.so at load time. Build a
+              # static libcurl.a against the static OpenSSL above and point
+              # FindCURL at it (ARROW_S3 -> bundled AWS SDK -> libcurl). All
+              # optional protocols/deps are disabled so the static archive
+              # depends only on our OpenSSL (no zlib/brotli/nghttp2/...).
+              # --with-openssl=/usr/local pins OUR no-zlib static OpenSSL,
+              # otherwise curl may find the system (dynamic) libssl.so.
+              # Idempotent: skipped if already built in a prior run.
+              if ! find /usr/local -name 'libcurl.a' 2>/dev/null | grep -q .; then
+                echo "=== Building static libcurl 8.5.0 from source ==="
+                (
+                  cd /tmp && rm -rf curl-8.5.0* && \
+                  curl -fsSL https://github.com/curl/curl/releases/download/curl-8_5_0/curl-8.5.0.tar.gz -o curl.tar.gz && \
+                  tar xzf curl.tar.gz && cd curl-8.5.0 && \
+                  ./configure --prefix=/usr/local --disable-shared --enable-static \
+                    --with-pic --with-openssl=/usr/local \
+                    --without-zlib --without-brotli --without-libidn2 \
+                    --without-nghttp2 --without-libpsl --without-libssh2 \
+                    --disable-ldap --disable-ldaps --disable-dict \
+                    --disable-telnet --disable-tftp --disable-imap \
+                    --disable-pop3 --disable-smtp --disable-gopher \
+                    --disable-rtsp --disable-manual --disable-docs \
+                    --disable-curldebug && \
+                  make -j$(nproc) && make install
+                )
+              else
+                echo "Static libcurl already present"
+              fi
+              export CURL_USE_STATIC_LIBS=ON
+              export CURL_LIBRARY="$(find /usr/local -name 'libcurl.a' 2>/dev/null | head -1)"
+              export CURL_INCLUDE_DIR=/usr/local/include
+              export PATH="/usr/local/bin:${PATH}"
+              echo "=== static libcurl ==="
+              ls -l "$CURL_LIBRARY"
+              /usr/local/bin/curl-config --static-libs
               # vcpkg is enabled by duckdb_extension.Makefile via the
               # VCPKG_TOOLCHAIN_PATH variable: if non-empty, make passes
               # -DVCPKG_BUILD=1 -DCMAKE_TOOLCHAIN_FILE=... and the repo has no
@@ -231,6 +267,15 @@ jobs:
               export PATH="/opt/python/cp312-cp312/bin:${PATH}"
               cd /duckdb_build_dir && make release
             '
+
+      - name: Verify no dynamic libcurl/libssl dependency
+        run: |
+          echo "=== duckdb NEEDED (grep curl/ssl) ==="
+          objdump -p build/release/duckdb | grep -E "NEEDED.*(curl|ssl|crypto)" || echo "OK: no libcurl/libssl.so dependency in duckdb"
+          echo "=== extension NEEDED (grep curl/ssl) ==="
+          objdump -p build/release/extension/duckdb_graphar/duckdb_graphar.duckdb_extension | grep -E "NEEDED.*(curl|ssl|crypto)" || echo "OK: no libcurl/libssl.so dependency in extension"
+          echo "=== full NEEDED list (diagnostics) ==="
+          objdump -p build/release/extension/duckdb_graphar/duckdb_graphar.duckdb_extension | grep NEEDED
 
       - name: Verify DuckDB build version
         run: |

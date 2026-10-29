@@ -31,6 +31,29 @@ GRAPHAR_INSTALLED = $(GRAPHAR_DIR)/.installed
 ARROW_ROOT=$(ARROW_INSTALL_DIR)
 GRAPHAR_ROOT=$(GRAPHAR_INSTALL_DIR)
 
+# Optional static libcurl for the manylinux build. ARROW_S3 pulls the bundled
+# AWS SDK, which links libcurl. By default the system (dynamic) libcurl is
+# used; to link a static libcurl instead, set these from the environment (as
+# the manylinux CI does) and they are forwarded to the Arrow configure so the
+# bundled AWS SDK is linked against libcurl.a. Left empty on macOS/Ubuntu.
+CURL_CMAKE_ARGS =
+ifneq ($(strip $(CURL_USE_STATIC_LIBS)),)
+CURL_CMAKE_ARGS += -DCURL_USE_STATIC_LIBS=$(CURL_USE_STATIC_LIBS)
+endif
+ifneq ($(strip $(CURL_LIBRARY)),)
+CURL_CMAKE_ARGS += -DCURL_LIBRARY=$(CURL_LIBRARY)
+endif
+ifneq ($(strip $(CURL_INCLUDE_DIR)),)
+CURL_CMAKE_ARGS += -DCURL_INCLUDE_DIR=$(CURL_INCLUDE_DIR)
+endif
+
+# Forward the same static-libcurl flags to the final DuckDB/extension configure
+# too. The installed arrow_static exports CURL::libcurl in its interface link
+# libraries, so if the top-level configure resolves a *system* (dynamic) libcurl
+# instead, the final link would pull libcurl.so back in. Empty on macOS/Ubuntu.
+EXT_RELEASE_FLAGS += $(CURL_CMAKE_ARGS)
+EXT_DEBUG_FLAGS += $(CURL_CMAKE_ARGS)
+
 # Include the Makefile from extension-ci-tools
 include extension-ci-tools/makefiles/duckdb_extension.Makefile
 
@@ -70,6 +93,7 @@ $(ARROW_BUILT): $(ARROW_CLONED)
 		-DCMAKE_INSTALL_PREFIX=$(ARROW_INSTALL_DIR) \
 		-DARROW_DEPENDENCY_SOURCE=BUNDLED \
 		-DARROW_DEPENDENCY_USE_SHARED=OFF \
+		$(CURL_CMAKE_ARGS) \
 		-G Ninja
 	@touch $(ARROW_BUILT)
 
