@@ -2,6 +2,7 @@
 
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
+#include "utils/profile_metrics.hpp"
 
 #include <arrow/c/bridge.h>
 
@@ -36,11 +37,8 @@ void ReadEdges::SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info,
 //-------------------------------------------------------------------
 unique_ptr<FunctionData> ReadEdges::Bind(ClientContext& context, TableFunctionBindInput& input,
                                          vector<LogicalType>& return_types, vector<Identifier>& names) {
-    bool time_logging = GraphArSettings::is_time_logging(context);
-
-    ScopedTimer t("Bind");
-
-    DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::Bind Parse parameters");
+    DUCKDB_GRAPHAR_LOG_TRACE("ReadEdges::Bind");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     const auto file_path = StringValue::Get(input.inputs[0]);
     const std::string src_type = StringValue::Get(input.named_parameters.at("src"));
@@ -73,9 +71,6 @@ unique_ptr<FunctionData> ReadEdges::Bind(ClientContext& context, TableFunctionBi
                    [](const auto& return_type) { return GraphArFunctions::graphArT2duckT(return_type); });
 
     DUCKDB_GRAPHAR_LOG_DEBUG("Bind finish");
-    if (time_logging) {
-        t.print();
-    }
 
     return bind_data;
 }
@@ -293,7 +288,7 @@ TableFunction ReadEdges::GetFunction() {
 // GetScanFunction
 //-------------------------------------------------------------------
 TableFunction ReadEdges::GetScanFunction() {
-    TableFunction read_edges("", {}, Execute, Bind);
+    TableFunction read_edges(Identifier(GetFunctionName()), {}, Execute, Bind);
     InitFunction(read_edges);
 
     return read_edges;

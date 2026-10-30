@@ -22,6 +22,7 @@ public:
     static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output);
     static TableFunctionSet GetFunctions();
     static void Register(ExtensionLoader& loader) { loader.RegisterFunction(GetFunctions()); }
+    static std::string GetFunctionName() { return "graphar_info"; }
 };
 
 }  // namespace duckdb

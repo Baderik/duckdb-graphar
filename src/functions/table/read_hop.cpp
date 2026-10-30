@@ -5,6 +5,7 @@
 #include "storage/graphar_schema_entry.hpp"
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
+#include "utils/profile_metrics.hpp"
 
 #include <arrow/c/bridge.h>
 
@@ -28,6 +29,7 @@ namespace duckdb {
 unique_ptr<FunctionData> ReadHop::BindGraphPath(ClientContext& context, TableFunctionBindInput& input,
                                                 vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::BindGraphPath");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<ReadHopBindData>();
 
@@ -38,6 +40,7 @@ unique_ptr<FunctionData> ReadHop::BindGraphPath(ClientContext& context, TableFun
 unique_ptr<FunctionData> ReadHop::BindEdgePath(ClientContext& context, TableFunctionBindInput& input,
                                                vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::BindEdgePath");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<ReadHopBindData>();
     HopBase::SetBindDataByEdgePath(context, input, *bind_data);
@@ -47,6 +50,7 @@ unique_ptr<FunctionData> ReadHop::BindEdgePath(ClientContext& context, TableFunc
 unique_ptr<FunctionData> ReadHop::BindEdgeCatalog(ClientContext& context, TableFunctionBindInput& input,
                                                   vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::BindEdgeCatalog");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<ReadHopBindData>();
 
@@ -58,6 +62,8 @@ unique_ptr<FunctionData> ReadHop::FinishBind(ClientContext& context, TableFuncti
                                              unique_ptr<ReadHopBindData> bind_data, vector<LogicalType>& return_types,
                                              vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::FinishBind");
+
+    GraphArQueryTimer timer(context, GraphArMetricName(ReadHop::GetFunctionName(), "bind"));
 
     HopBase::SetBindDataVids(input, *bind_data);
     HopBase::SetBindDataFilter(*bind_data);
@@ -110,28 +116,20 @@ TableFunctionSet ReadHop::GetFunctions() {
     TableFunctionSet read_hop((Identifier(GetFunctionName())));
 
     // Graph-path overload: read_hop(path.yaml, src=..., dst=..., type=..., [vids|vid]).
-    TableFunction read_hop_graph_path("", {}, Execute, BindGraphPath);
+    TableFunction read_hop_graph_path({}, Execute, BindGraphPath);
     SetGraphPathTableFunctionParams(read_hop_graph_path);
     read_hop.AddFunction(read_hop_graph_path);
 
     // Edge-path overload: read_hop(edgePath=edge.yaml, [vids|vid]).
-    TableFunction read_hop_edge_path("", {}, Execute, BindEdgePath);
+    TableFunction read_hop_edge_path({}, Execute, BindEdgePath);
     SetEdgePathTableFunctionParams(read_hop_edge_path);
     read_hop.AddFunction(read_hop_edge_path);
 
     // Edge-path/catalog overload: read_hop(edge.yaml, [vids|vid]) or read_hop(table, catalog=..., [vids|vid]).
-    TableFunction read_hop_edge_catalog("", {}, Execute, BindEdgeCatalog);
+    TableFunction read_hop_edge_catalog({}, Execute, BindEdgeCatalog);
     SetEdgeCatalogTableFunctionParams(read_hop_edge_catalog);
     read_hop.AddFunction(read_hop_edge_catalog);
 
-    return read_hop;
-}
-//-------------------------------------------------------------------
-// GetScanFunction
-//-------------------------------------------------------------------
-TableFunction ReadHop::GetScanFunction() {
-    TableFunction read_hop("", {}, Execute, BindEdgeCatalog);
-    SetEdgeCatalogTableFunctionParams(read_hop);
     return read_hop;
 }
 //-------------------------------------------------------------------
@@ -139,6 +137,7 @@ TableFunction ReadHop::GetScanFunction() {
 //-------------------------------------------------------------------
 unique_ptr<GlobalTableFunctionState> ReadHop::InitWrapper(ClientContext& context, TableFunctionInitInput& input) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::InitWrapper");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Init));
 
     auto bind_data = input.bind_data->Cast<ReadHopBindData>();
     bool dst_column_found = true;
@@ -168,6 +167,8 @@ unique_ptr<GlobalTableFunctionState> ReadHop::InitWrapper(ClientContext& context
 unique_ptr<LocalTableFunctionState> ReadHop::InitLocalWrapper(ExecutionContext& context, TableFunctionInitInput& input,
                                                               GlobalTableFunctionState* gstate_ptr) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::InitLocalWrapper");
+    GraphArQueryTimer timer(context.client, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::InitLocal));
+
     auto& gstate = gstate_ptr->Cast<ReadHopGlobalTableFunctionState>();
 
     auto base_lstate_ptr = InitLocal(context, input, gstate_ptr);
@@ -220,6 +221,7 @@ idx_t ReadHop::FetchRowsNum(ReadHopGlobalTableFunctionState& gstate, ReadHopLoca
 
 void ReadHop::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHop::Execute");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Execute));
 
     ReadHopGlobalTableFunctionState& gstate = input.global_state->Cast<ReadHopGlobalTableFunctionState>();
     ReadHopLocalTableFunctionState& lstate = input.local_state->Cast<ReadHopLocalTableFunctionState>();

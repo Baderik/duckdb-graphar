@@ -3,6 +3,7 @@
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
+#include "utils/profile_metrics.hpp"
 #include "utils/pua_init.hpp"
 #include "utils/type_info.hpp"
 #include "utils/vid_filter.hpp"
@@ -30,11 +31,9 @@ namespace duckdb {
 //-------------------------------------------------------------------
 unique_ptr<FunctionData> Degree::Bind(ClientContext& context, TableFunctionBindInput& input,
                                       vector<LogicalType>& return_types, vector<Identifier>& names) {
-    bool time_logging = GraphArSettings::is_time_logging(context);
-
-    ScopedTimer t("Bind");
-
     DUCKDB_GRAPHAR_LOG_TRACE("Degree::Bind");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
+
 
     const auto file_path = StringValue::Get(input.inputs[0]);
     const std::string src_type = StringValue::Get(input.named_parameters.at("src"));
@@ -76,9 +75,6 @@ unique_ptr<FunctionData> Degree::Bind(ClientContext& context, TableFunctionBindI
     usage_analytics::EmitGraphOperationEvent(context, "degree", bind_data->file_path);
 
     DUCKDB_GRAPHAR_LOG_DEBUG("Degree::Bind finish");
-    if (time_logging) {
-        t.print();
-    }
 
     return bind_data;
 }
@@ -203,6 +199,8 @@ std::vector<int64_t> Degree::ReadDegrees(DegreeGlobalState& state, graphar::AdjL
 //-------------------------------------------------------------------
 unique_ptr<GlobalTableFunctionState> DegreeGlobalTableFunctionState::Init(ClientContext& context,
                                                                           TableFunctionInitInput& input) {
+    GraphArQueryTimer timer(context, GraphArMetricName(Degree::GetFunctionName(), GraphArMetrics::State::Init));
+
     auto& bind_data = input.bind_data->Cast<DegreeBindData>();
 
     auto gstate = DegreeGlobalState();
@@ -255,9 +253,7 @@ unique_ptr<GlobalTableFunctionState> DegreeGlobalTableFunctionState::Init(Client
 // Execute
 //-------------------------------------------------------------------
 void Degree::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
-    bool time_logging = GraphArSettings::is_time_logging(context);
-
-    ScopedTimer t("Execute");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Execute));
 
     DUCKDB_GRAPHAR_LOG_TRACE("Degree::Execute");
 
@@ -338,9 +334,6 @@ void Degree::Execute(ClientContext& context, TableFunctionInput& input, DataChun
     gstate.chunk_count++;
 
     DUCKDB_GRAPHAR_LOG_DEBUG("Degree::Execute wrote " + std::to_string(written) + " rows");
-    if (time_logging) {
-        t.print();
-    }
 }
 //-------------------------------------------------------------------
 // PushdownComplexFilter
@@ -375,7 +368,7 @@ void Degree::PushdownComplexFilter(ClientContext& context, LogicalGet& get, Func
 // GetFunction
 //-------------------------------------------------------------------
 TableFunction Degree::GetFunction() {
-    TableFunction degree(Identifier("degree"), {LogicalType::VARCHAR}, Execute, Bind);
+    TableFunction degree(Identifier(GetFunctionName()), {LogicalType::VARCHAR}, Execute, Bind);
     degree.init_global = DegreeGlobalTableFunctionState::Init;
 
     degree.filter_pushdown = false;

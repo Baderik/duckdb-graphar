@@ -1,6 +1,7 @@
 #include "functions/table/graphar_info.hpp"
 
 #include "utils/func.hpp"
+#include "utils/profile_metrics.hpp"
 #include "utils/pua_init.hpp"
 
 #include <cstdint>
@@ -10,6 +11,8 @@ namespace duckdb {
 unique_ptr<FunctionData> GraphArInfo::Bind(ClientContext& context, TableFunctionBindInput& input,
                                            vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("GraphArInfo::Bind");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
+
     names.emplace_back("extension_commit");
     return_types.emplace_back(GraphArFunctions::graphArT2duckT("string"));
     names.emplace_back("build_timestamp");
@@ -19,12 +22,16 @@ unique_ptr<FunctionData> GraphArInfo::Bind(ClientContext& context, TableFunction
 
 unique_ptr<GlobalTableFunctionState> GraphArInfo::Init(ClientContext& context, TableFunctionInitInput& input) {
     DUCKDB_GRAPHAR_LOG_TRACE("GraphArInfo::Init");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Init));
+
     usage_analytics::EmitGraphOperationEvent(context, "graphar_info");
     return make_uniq<GraphArVersionData>();
 }
 
 void GraphArInfo::Execute(ClientContext& context, TableFunctionInput& data_p, DataChunk& output) {
     DUCKDB_GRAPHAR_LOG_TRACE("GraphArInfo::Execute");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Execute));
+
     auto& data = data_p.global_state->Cast<GraphArVersionData>();
     if (data.finished.exchange(true, std::memory_order_relaxed)) {
         return;
@@ -45,7 +52,7 @@ void GraphArInfo::Execute(ClientContext& context, TableFunctionInput& data_p, Da
 }
 
 TableFunctionSet GraphArInfo::GetFunctions() {
-    TableFunction information_f = TableFunction("graphar_info", {}, Execute, Bind, Init);
+    TableFunction information_f(Identifier(GetFunctionName()), {}, Execute, Bind, Init);
     return TableFunctionSet(information_f);
 }
 

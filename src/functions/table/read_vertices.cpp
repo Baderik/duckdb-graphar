@@ -2,6 +2,7 @@
 
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
+#include "utils/profile_metrics.hpp"
 
 #include <arrow/c/bridge.h>
 
@@ -37,9 +38,8 @@ void ReadVertices::SetBindData(std::shared_ptr<graphar::GraphInfo> graph_info,
 //-------------------------------------------------------------------
 unique_ptr<FunctionData> ReadVertices::Bind(ClientContext& context, TableFunctionBindInput& input,
                                             vector<LogicalType>& return_types, vector<Identifier>& names) {
-    bool time_logging = GraphArSettings::is_time_logging(context);
-
-    ScopedTimer t("Bind");
+    DUCKDB_GRAPHAR_LOG_TRACE("ReadVertices::Bind");
+    GraphArQueryTimer timer(context, GraphArMetricName(ReadVertices::GetFunctionName(), GraphArMetrics::State::Bind));
 
     DUCKDB_GRAPHAR_LOG_DEBUG("ReadVertices::Bind Parse parameters");
 
@@ -72,9 +72,6 @@ unique_ptr<FunctionData> ReadVertices::Bind(ClientContext& context, TableFunctio
                    [](const auto& return_type) { return GraphArFunctions::graphArT2duckT(return_type); });
 
     DUCKDB_GRAPHAR_LOG_DEBUG("Bind finish");
-    if (time_logging) {
-        t.print();
-    }
 
     return bind_data;
 }
@@ -224,7 +221,7 @@ TableFunction ReadVertices::GetFunction() {
 // GetScanFunction
 //-------------------------------------------------------------------
 TableFunction ReadVertices::GetScanFunction() {
-    TableFunction read_vertices("", {}, Execute, Bind);
+    TableFunction read_vertices(Identifier(GetFunctionName()), {}, Execute, Bind);
     InitFunction(read_vertices);
 
     return read_vertices;

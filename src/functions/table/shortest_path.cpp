@@ -4,6 +4,7 @@
 #include "storage/graphar_table_information.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
+#include "utils/profile_metrics.hpp"
 #include "utils/pua_init.hpp"
 #include "utils/type_info.hpp"
 
@@ -19,6 +20,7 @@ namespace duckdb {
 unique_ptr<FunctionData> ShortestPath::BindGraphPath(ClientContext& context, TableFunctionBindInput& input,
                                                      vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ShortestPath::BindGraphPath");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<ShortestPathBindData>();
     bind_data->start_id = input.inputs[0].GetValue<graphar::IdType>();
@@ -77,6 +79,7 @@ unique_ptr<FunctionData> ShortestPath::BindGraphPath(ClientContext& context, Tab
 unique_ptr<FunctionData> ShortestPath::BindCatalog(ClientContext& context, TableFunctionBindInput& input,
                                                    vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ShortestPath::BindCatalog");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<ShortestPathBindData>();
     bind_data->start_id = input.inputs[0].GetValue<graphar::IdType>();
@@ -140,6 +143,7 @@ unique_ptr<FunctionData> ShortestPath::BindCatalog(ClientContext& context, Table
 
 unique_ptr<GlobalTableFunctionState> ShortestPath::InitGlobal(ClientContext& context, TableFunctionInitInput& input) {
     DUCKDB_GRAPHAR_LOG_TRACE("ShortestPath::InitGlobal");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Init));
 
     auto global_state = make_uniq<ShortestPathGlobalState>();
     const auto& bind_data = input.bind_data->Cast<ShortestPathBindData>();
@@ -300,6 +304,7 @@ unique_ptr<GlobalTableFunctionState> ShortestPath::InitGlobal(ClientContext& con
 
 void ShortestPath::Function(ClientContext& context, TableFunctionInput& data_p, DataChunk& output) {
     DUCKDB_GRAPHAR_LOG_TRACE("ShortestPath::Function");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Execute));
 
     auto& bind_data = data_p.bind_data->Cast<ShortestPathBindData>();
     auto& global_state = data_p.global_state->Cast<ShortestPathGlobalState>();
@@ -327,7 +332,7 @@ void ShortestPath::Function(ClientContext& context, TableFunctionInput& data_p, 
 
 TableFunction ShortestPath::GetFunction() {
     // Graph-path overload: shortest_path(start, end, graph_path, src=..., type=..., dst=...).
-    TableFunction func(Identifier("shortest_path"), {LogicalType::BIGINT, LogicalType::BIGINT, LogicalType::VARCHAR},
+    TableFunction func(Identifier(GetFunctionName()), {LogicalType::BIGINT, LogicalType::BIGINT, LogicalType::VARCHAR},
                        Function, BindGraphPath, InitGlobal);
     func.GetSignature().AddKeywordOnly("src", LogicalType::VARCHAR);
     func.GetSignature().AddKeywordOnly("type", LogicalType::VARCHAR);
@@ -339,12 +344,14 @@ TableFunctionSet ShortestPath::GetFunctions() {
     // Supports two signatures:
     // 1. shortest_path(start_id, end_id, edge_table_name) - uses catalog lookup
     // 2. shortest_path(start_id, end_id, graph_path, src=..., type=..., dst=...) - uses YAML path
-    TableFunctionSet set(Identifier("shortest_path"));
-    set.AddFunction(GetFunction());
-    TableFunction func_catalog("", {LogicalType::BIGINT, LogicalType::BIGINT, LogicalType::VARCHAR}, Function,
+    TableFunctionSet shortest_path_set((Identifier(GetFunctionName())));
+
+    TableFunction func_yaml = GetFunction();
+    shortest_path_set.AddFunction(func_yaml);
+    TableFunction func_catalog(Identifier(GetFunctionName()), {LogicalType::BIGINT, LogicalType::BIGINT, LogicalType::VARCHAR}, Function,
                                BindCatalog, InitGlobal);
-    set.AddFunction(func_catalog);
-    return set;
+    shortest_path_set.AddFunction(func_catalog);
+    return shortest_path_set;
 }
 
 void ShortestPath::Register(ExtensionLoader& loader) { loader.RegisterFunction(GetFunctions()); }

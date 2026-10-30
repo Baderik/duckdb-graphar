@@ -6,6 +6,7 @@
 #include "storage/graphar_schema_entry.hpp"
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
+#include "utils/profile_metrics.hpp"
 
 #include <arrow/c/bridge.h>
 
@@ -29,6 +30,7 @@ namespace duckdb {
 unique_ptr<FunctionData> ReadHopFiltered::BindGraphPath(ClientContext& context, TableFunctionBindInput& input,
                                                         vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHopFiltered::BindGraphPath");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<ReadHopFilteredBindData>();
 
@@ -41,6 +43,7 @@ unique_ptr<FunctionData> ReadHopFiltered::BindEdgeCatalog(ClientContext& context
                                                           vector<LogicalType>& return_types,
                                                           vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHopFiltered::BindEdgeCatalog");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<ReadHopFilteredBindData>();
     HopBase::SetBindDataByEdgeTable(context, input, *bind_data);
@@ -122,24 +125,15 @@ void ReadHopFiltered::PushdownComplexFilter(ClientContext& context, LogicalGet& 
 TableFunctionSet ReadHopFiltered::GetFunctions() {
     TableFunctionSet read_hop_filtered((Identifier(GetFunctionName())));
 
-    TableFunction read_hop_graph_path("", {}, Execute, BindGraphPath);
+    TableFunction read_hop_graph_path({}, Execute, BindGraphPath);
     SetGraphPathTableFunctionParams(read_hop_graph_path);
     read_hop_filtered.AddFunction(read_hop_graph_path);
 
-    TableFunction read_hop_edge_catalog("", {}, Execute, BindEdgeCatalog);
+    TableFunction read_hop_edge_catalog({}, Execute, BindEdgeCatalog);
     SetEdgeCatalogTableFunctionParams(read_hop_edge_catalog);
     read_hop_filtered.AddFunction(read_hop_edge_catalog);
 
     return read_hop_filtered;
-}
-//-------------------------------------------------------------------
-// GetScanFunction
-//-------------------------------------------------------------------
-TableFunction ReadHopFiltered::GetScanFunction() {
-    TableFunction read_hop("", {}, Execute, BindEdgeCatalog);
-    SetEdgeCatalogTableFunctionParams(read_hop);
-
-    return read_hop;
 }
 //-------------------------------------------------------------------
 // Init
@@ -147,6 +141,7 @@ TableFunction ReadHopFiltered::GetScanFunction() {
 unique_ptr<GlobalTableFunctionState> ReadHopFiltered::InitWrapper(ClientContext& context,
                                                                   TableFunctionInitInput& input) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHopFiltered::Init");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Init));
 
     auto bind_data = input.bind_data->Cast<ReadHopFilteredBindData>();
     bool dst_column_found = true;
@@ -228,6 +223,8 @@ unique_ptr<GlobalTableFunctionState> ReadHopFiltered::InitWrapper(ClientContext&
 unique_ptr<LocalTableFunctionState> ReadHopFiltered::InitLocal(ExecutionContext& context, TableFunctionInitInput& input,
                                                                GlobalTableFunctionState* gstate_ptr) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHopFiltered::InitLocal");
+    GraphArQueryTimer timer(context.client, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::InitLocal));
+
     auto bind_data = input.bind_data->Cast<ReadHopFilteredBindData>();
 
     auto lstate_ptr = make_uniq<ReadHopFilteredLocalTableFunctionState>();
@@ -333,6 +330,7 @@ idx_t ReadHopFiltered::FetchRowsNum(ReadHopFilteredGlobalTableFunctionState& gst
 }
 void ReadHopFiltered::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
     DUCKDB_GRAPHAR_LOG_TRACE("ReadHopFiltered::Execute");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Execute));
 
     ReadHopFilteredGlobalTableFunctionState& gstate =
         input.global_state->Cast<ReadHopFilteredGlobalTableFunctionState>();

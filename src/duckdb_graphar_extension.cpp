@@ -13,6 +13,7 @@
 #include "storage/graphar_storage.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
+#include "utils/profile_metrics.hpp"
 #include "utils/pua_init.hpp"
 
 #include <duckdb/common/exception.hpp>
@@ -60,6 +61,20 @@ static void LoadInternal(ExtensionLoader& loader) {
 
     // Initialize GlobalLogManager before using any logging macros
     GlobalLogManager::Initialize(loader.GetDatabaseInstance(), duckdb::LogLevel::LOG_WARNING);
+
+    // Register the extension's custom query metrics (surfaces in EXPLAIN ANALYZE / duckdb_metrics()).
+    RegisterGraphArMetrics(MetricsManager::Get(loader.GetDatabaseInstance()));
+    for (const auto &function_name : {ReadVertices::GetFunctionName(), 
+                                      ReadEdges::GetFunctionName(),
+                                      Degree::GetFunctionName(),
+                                      TwoHop::GetFunctionName(),
+                                      ReadHop::GetFunctionName(),
+                                      ReadHopFiltered::GetFunctionName(),
+                                      GraphArInfo::GetFunctionName(),
+                                      ShortestPath::GetFunctionName()
+                                       }) {
+        RegisterGraphArFunctionMetrics(MetricsManager::Get(loader.GetDatabaseInstance()), function_name);
+    }
 
     auto duckdb_graphar_scalar_function =
         ScalarFunction("duckdb_graphar", {LogicalType::VARCHAR}, LogicalType::VARCHAR, QuackScalarFun);

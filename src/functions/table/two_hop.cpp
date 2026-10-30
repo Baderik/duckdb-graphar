@@ -6,6 +6,7 @@
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
+#include "utils/profile_metrics.hpp"
 #include "utils/pua_init.hpp"
 
 #include <duckdb/common/named_parameter_map.hpp>
@@ -25,6 +26,7 @@ namespace duckdb {
 unique_ptr<FunctionData> TwoHop::BindGraphPath(ClientContext& context, TableFunctionBindInput& input,
                                                vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::BindGraphPath");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<TwoHopBindData>();
     HopBase::SetBindDataByGraphPath(context, input, *bind_data);
@@ -34,6 +36,7 @@ unique_ptr<FunctionData> TwoHop::BindGraphPath(ClientContext& context, TableFunc
 unique_ptr<FunctionData> TwoHop::BindEdgePath(ClientContext& context, TableFunctionBindInput& input,
                                               vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::BindEdgePath");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<TwoHopBindData>();
     HopBase::SetBindDataByEdgePath(context, input, *bind_data);
@@ -43,6 +46,7 @@ unique_ptr<FunctionData> TwoHop::BindEdgePath(ClientContext& context, TableFunct
 unique_ptr<FunctionData> TwoHop::BindEdgeCatalog(ClientContext& context, TableFunctionBindInput& input,
                                                  vector<LogicalType>& return_types, vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::BindEdgeCatalog");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Bind));
 
     auto bind_data = make_uniq<TwoHopBindData>();
     HopBase::SetBindDataByEdgeTable(context, input, *bind_data);
@@ -53,6 +57,8 @@ unique_ptr<FunctionData> TwoHop::FinishBind(ClientContext& context, TableFunctio
                                             unique_ptr<TwoHopBindData> bind_data, vector<LogicalType>& return_types,
                                             vector<Identifier>& names) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::FinishBind");
+
+    GraphArQueryTimer timer(context, GraphArMetricName(TwoHop::GetFunctionName(), "bind"));
 
     HopBase::SetBindDataVids(input, *bind_data);
 
@@ -69,6 +75,7 @@ unique_ptr<FunctionData> TwoHop::FinishBind(ClientContext& context, TableFunctio
 //-------------------------------------------------------------------
 unique_ptr<GlobalTableFunctionState> TwoHop::Init(ClientContext& context, TableFunctionInitInput& input) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::Init");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Init));
 
     auto bind_data = input.bind_data->Cast<TwoHopBindData>();
     usage_analytics::EmitGraphOperationEvent(context, "two_hop", bind_data.GetTableName());
@@ -88,6 +95,7 @@ unique_ptr<GlobalTableFunctionState> TwoHop::Init(ClientContext& context, TableF
 unique_ptr<LocalTableFunctionState> TwoHop::InitLocal(ExecutionContext& context, TableFunctionInitInput& input,
                                                       GlobalTableFunctionState* gstate_ptr) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::LocalStateInit");
+    GraphArQueryTimer timer(context.client, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::InitLocal));
 
     TwoHopGlobalTableFunctionState& gstate = gstate_ptr->Cast<TwoHopGlobalTableFunctionState>();
 
@@ -103,6 +111,8 @@ unique_ptr<LocalTableFunctionState> TwoHop::InitLocal(ExecutionContext& context,
 //-------------------------------------------------------------------
 void TwoHop::Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
     DUCKDB_GRAPHAR_LOG_TRACE("TwoHop::Execute");
+    GraphArQueryTimer timer(context, GraphArMetricName(GetFunctionName(), GraphArMetrics::State::Execute));
+
     auto& gstate = input.global_state->Cast<TwoHopGlobalTableFunctionState>();
     auto& lstate = input.local_state->Cast<TwoHopLocalTableFunctionState>();
 
@@ -134,15 +144,15 @@ void TwoHop::Execute(ClientContext& context, TableFunctionInput& input, DataChun
 TableFunctionSet TwoHop::GetFunctions() {
     TableFunctionSet two_hop((Identifier(GetFunctionName())));
 
-    TableFunction two_hop_graph_path("", {}, Execute, BindGraphPath);
+    TableFunction two_hop_graph_path({}, Execute, BindGraphPath);
     SetGraphPathTableFunctionParams(two_hop_graph_path);
     two_hop.AddFunction(two_hop_graph_path);
 
-    TableFunction two_hop_edge_path("", {}, Execute, BindEdgePath);
+    TableFunction two_hop_edge_path({}, Execute, BindEdgePath);
     SetEdgePathTableFunctionParams(two_hop_edge_path);
     two_hop.AddFunction(two_hop_edge_path);
 
-    TableFunction two_hop_edge_catalog("", {}, Execute, BindEdgeCatalog);
+    TableFunction two_hop_edge_catalog({}, Execute, BindEdgeCatalog);
     SetEdgeCatalogTableFunctionParams(two_hop_edge_catalog);
     two_hop.AddFunction(two_hop_edge_catalog);
 

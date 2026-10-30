@@ -9,6 +9,7 @@
 #include "utils/benchmark.hpp"
 #include "utils/func.hpp"
 #include "utils/global_log_manager.hpp"
+#include "utils/profile_metrics.hpp"
 #include "utils/pua_init.hpp"
 #include "utils/type_info.hpp"
 #include "utils/vid_filter.hpp"
@@ -452,6 +453,7 @@ public:
                             unique_ptr<ReadBindData>& bind_data, string function_name, idx_t id_columns_num = 0,
                             idx_t pg_for_id = 0, vector<string> id_columns = {}) {
         DUCKDB_GRAPHAR_LOG_TRACE("ReadBase::SetBindData");
+
         const auto& prefix = graph_info->GetPrefix();
         if (!prefix.starts_with("s3://") && std::filesystem::path(prefix).is_relative()) {
             throw IOException(
@@ -625,6 +627,8 @@ public:
     static unique_ptr<BaseStatistics> GetStatistics(ClientContext& context, const FunctionData* bind_data,
                                                     column_t column_index) {
         DUCKDB_GRAPHAR_LOG_TRACE("ReadBase::GetStatistics");
+        // GraphArQueryTimer timer(context, GraphArMetricName(ReadFinal::GetFunctionName(), "GetStatistics"));
+
         auto& read_bind_data = bind_data->Cast<ReadBindData>();
         if (column_index < 0 || column_index >= read_bind_data.GetFlattenPropTypes().size()) {
             return nullptr;
@@ -656,20 +660,12 @@ public:
     }
 
     static unique_ptr<GlobalTableFunctionState> Init(ClientContext& context, TableFunctionInitInput& input) {
-        DUCKDB_GRAPHAR_LOG_TRACE("Init started");
-        bool time_logging = GraphArSettings::is_time_logging(context);
-
-        ScopedTimer t("StateInit");
+        DUCKDB_GRAPHAR_LOG_TRACE("ReadBase::Init");
+        GraphArQueryTimer timer(context, GraphArMetricName(ReadFinal::GetFunctionName(), GraphArMetrics::State::Init));
 
         auto& bind_data_ref = input.bind_data->Cast<ReadBindData>();
         const auto table_name = bind_data_ref.GetTableName();
         auto bind_data = input.bind_data->Cast<ReadBindData>();
-
-        DUCKDB_GRAPHAR_LOG_TRACE(bind_data.function_name + "::Init");
-
-        if (time_logging) {
-            t.print("cast");
-        }
 
         auto gstate_ptr = make_uniq<ReadBaseGlobalTableFunctionState>();
         auto& gstate = *gstate_ptr;
@@ -791,26 +787,20 @@ public:
                 SetFilter(context, gstate, ind, vid_ranges, filter_column);
             }
         }
-        if (time_logging) {
-            t.print("filter setting");
-        }
 
         gstate.local_projected_inds = std::move(local_projected_inds);
 
         DUCKDB_GRAPHAR_LOG_DEBUG("::Init Done");
-        if (time_logging) {
-            t.print();
-        }
 
         return gstate_ptr;
     }
 
     static unique_ptr<LocalTableFunctionState> InitLocal(ExecutionContext& context, TableFunctionInitInput& input,
                                                          GlobalTableFunctionState* gstate_ptr) {
-        DUCKDB_GRAPHAR_LOG_TRACE("Local init started");
-        auto bind_data = input.bind_data->Cast<ReadBindData>();
+        DUCKDB_GRAPHAR_LOG_TRACE("ReadBase::LocalInit");
+        GraphArQueryTimer timer(context.client, GraphArMetricName(ReadFinal::GetFunctionName(), GraphArMetrics::State::InitLocal));
 
-        DUCKDB_GRAPHAR_LOG_TRACE(bind_data.function_name + "::Init");
+        auto bind_data = input.bind_data->Cast<ReadBindData>();
 
         auto lstate_ptr = make_uniq<ReadBaseLocalTableFunctionState>();
         auto& lstate = *lstate_ptr;
@@ -833,11 +823,8 @@ public:
     }
 
     static void Execute(ClientContext& context, TableFunctionInput& input, DataChunk& output) {
-        bool time_logging = GraphArSettings::is_time_logging(context);
-
-        ScopedTimer t("Execute");
-
-        DUCKDB_GRAPHAR_LOG_DEBUG("::Execute Cast state");
+        DUCKDB_GRAPHAR_LOG_TRACE("ReadBase::Execute");
+        GraphArQueryTimer timer(context, GraphArMetricName(ReadFinal::GetFunctionName(), GraphArMetrics::State::Execute));
 
         ReadBaseGlobalTableFunctionState& gstate = input.global_state->Cast<ReadBaseGlobalTableFunctionState>();
         ReadBaseLocalTableFunctionState& lstate = input.local_state->Cast<ReadBaseLocalTableFunctionState>();
@@ -893,15 +880,14 @@ public:
         gstate.total_rows += num_rows;
         DUCKDB_GRAPHAR_LOG_DEBUG("Size of chunk: " + std::to_string(num_rows) +
                                  " Total size: " + std::to_string(gstate.total_rows))
-        if (time_logging) {
-            t.print();
-        }
         gstate.chunk_count++;
     }
 
     template <typename ValidateFunc>
     static void PushdownComplexFilterImpl(ClientContext& context, ReadBindData& read_bind_data,
                                           vector<unique_ptr<Expression>>& filters, ValidateFunc validate_and_extract) {
+        // GraphArQueryTimer timer(context, GraphArMetricName(gstate.function_name, "PushdownComplexFilterImpl"));
+
         if (!read_bind_data.vid_ranges.empty()) {
             return;
         }

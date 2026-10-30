@@ -83,5 +83,6 @@ struct Degree {
 
     static void Register(ExtensionLoader& loader);
     static TableFunction GetFunction();
+    static inline std::string constexpr GetFunctionName() {return "degree";}
 };
 }  // namespace duckdb

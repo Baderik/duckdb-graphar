@@ -55,6 +55,7 @@ public:
     static TableFunctionSet GetFunctions();
 
     static void Register(ExtensionLoader& loader);
+    static std::string constexpr GetFunctionName() { return "shortest_path"; }
 };
 
 }  // namespace duckdb
